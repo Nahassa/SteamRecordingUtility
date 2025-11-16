@@ -385,7 +385,7 @@ namespace VideoConverterApp
 
                 // Build ffmpeg command
                 string vf = $"setdar=16/9,eq=saturation={settings.Saturation}";
-                string args = $"-i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -crf {settings.CRF} -b:v {settings.Bitrate}k -s {settings.OutputWidth}x{settings.OutputHeight} \"{outputPath}\"";
+                string args = $"-i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -pix_fmt yuv420p -crf {settings.CRF} -b:v {settings.Bitrate}k -s {settings.OutputWidth}x{settings.OutputHeight} \"{outputPath}\"";
 
                 bool success = await RunFFmpegAsync(args);
 
