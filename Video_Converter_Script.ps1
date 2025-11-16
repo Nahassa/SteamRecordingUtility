@@ -3,7 +3,11 @@ $inputFolder = "E:\Steam Recordings"
 $outputFolder = "E:\Steam Recordings\stretched"
 $processedFolder = Join-Path $inputFolder "processed"
 
+# Saturation adjustment (1.0 = default, higher values = more saturated, lower values = less saturated)
+$saturation = 1.2
+
 Write-Host "Starting video conversion..." -ForegroundColor Cyan
+Write-Host "Saturation: $saturation (1.0 = default)" -ForegroundColor Gray
 Write-Host ""
 
 if (!(Test-Path -Path $outputFolder)) {
@@ -34,8 +38,8 @@ foreach ($file in $videoFiles) {
     $processedPath = Join-Path -Path $processedFolder -ChildPath $file.Name
     
     Write-Host "[$counter/$($videoFiles.Count)] Processing: $($file.Name)" -ForegroundColor Yellow
-    
-    & ffmpeg -i "$inputPath" -vf "setdar=16/9" -c:v libx265 -crf 18 -b:v 20000k -s 1920x1080 "$outputPath"
+
+    & ffmpeg -i "$inputPath" -vf "setdar=16/9,eq=saturation=$saturation" -c:v libx265 -crf 18 -b:v 20000k -s 1920x1080 "$outputPath"
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Successfully converted: $($file.Name)" -ForegroundColor Green
