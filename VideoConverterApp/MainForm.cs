@@ -317,6 +317,21 @@ namespace VideoConverterApp
                 return;
             }
 
+            // Check if FFmpeg is available
+            if (!IsFFmpegAvailable())
+            {
+                MessageBox.Show(
+                    "FFmpeg not found!\n\n" +
+                    "Please ensure ffmpeg.exe is either:\n" +
+                    "1. In your system PATH, or\n" +
+                    "2. In the same folder as this application\n\n" +
+                    "Download FFmpeg from: https://www.gyan.dev/ffmpeg/builds/",
+                    "FFmpeg Required",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
             SaveSettings();
 
             btnConvert.Enabled = false;
@@ -384,7 +399,8 @@ namespace VideoConverterApp
                 LogInfo($"[{i + 1}/{videoFiles.Length}] Processing: {fileName}");
 
                 // Build ffmpeg command
-                string vf = $"setdar=16/9,eq=saturation={settings.Saturation}";
+                string saturationValue = settings.Saturation.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                string vf = $"setdar=16/9,eq=saturation={saturationValue}";
                 string args = $"-i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -pix_fmt yuv420p -crf {settings.CRF} -b:v {settings.Bitrate}k -s {settings.OutputWidth}x{settings.OutputHeight} \"{outputPath}\"";
 
                 bool success = await RunFFmpegAsync(args);
@@ -429,17 +445,67 @@ namespace VideoConverterApp
 
                     using Process? process = Process.Start(psi);
                     if (process == null)
+                    {
+                        Invoke(() => LogError("Failed to start FFmpeg process"));
                         return false;
+                    }
 
+                    // Read stderr for error messages
+                    string stderr = process.StandardError.ReadToEnd();
                     process.WaitForExit();
+
+                    if (process.ExitCode != 0)
+                    {
+                        // Log the last few lines of stderr which usually contain the error
+                        var errorLines = stderr.Split('\n')
+                            .Where(line => !string.IsNullOrWhiteSpace(line))
+                            .TakeLast(5);
+
+                        foreach (var line in errorLines)
+                        {
+                            Invoke(() => LogError($"  {line.Trim()}"));
+                        }
+                    }
+
                     return process.ExitCode == 0;
                 }
                 catch (Exception ex)
                 {
                     Invoke(() => LogError($"FFmpeg error: {ex.Message}"));
+                    if (ex is System.ComponentModel.Win32Exception)
+                    {
+                        Invoke(() => LogError("FFmpeg not found. Please ensure ffmpeg.exe is in PATH or in the same folder as this application."));
+                    }
                     return false;
                 }
             });
+        }
+
+        private bool IsFFmpegAvailable()
+        {
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = "-version",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using Process? process = Process.Start(psi);
+                if (process == null)
+                    return false;
+
+                process.WaitForExit();
+                return process.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void LogInfo(string message)
