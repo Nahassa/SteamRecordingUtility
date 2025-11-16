@@ -60,8 +60,8 @@ Replace `win-x86` with `win-x64` in the commands above.
 1. **Launch the Application** - Double-click `VideoConverterApp.exe`
 
 2. **Configure Settings**:
-   - Click "Browse" to select input folder (where your .mp4 files are)
-   - Click "Browse" to select output folder (where converted files will go)
+   - Click "..." button to select input folder (where your .mp4 files are)
+   - Click "..." button to select output folder (where converted files will go)
    - Choose output resolution from dropdown or enter custom values
    - Adjust saturation (1.0 = original, higher = more saturated)
    - Optional: Adjust CRF (18-23 recommended) and bitrate
@@ -75,11 +75,13 @@ Replace `win-x86` with `win-x64` in the commands above.
 
 Settings are automatically saved to `settings.json` in the same folder as the executable.
 
+**Note:** Input and output folders are blank by default. You must select them using the "..." buttons before converting videos.
+
 Example `settings.json`:
 ```json
 {
-  "InputFolder": "E:\\Steam Recordings",
-  "OutputFolder": "E:\\Steam Recordings\\stretched",
+  "InputFolder": "",
+  "OutputFolder": "",
   "OutputWidth": 1920,
   "OutputHeight": 1080,
   "Saturation": 1.2,

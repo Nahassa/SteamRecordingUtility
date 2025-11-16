@@ -43,8 +43,8 @@ namespace VideoConverterApp
 
             // Input Folder
             AddLabel("Input Folder:", 20, y);
-            txtInputFolder = new TextBox { Location = new Point(controlLeft, y), Width = 400 };
-            btnBrowseInput = new Button { Text = "Browse...", Location = new Point(controlLeft + 410, y - 2), Width = 80 };
+            txtInputFolder = new TextBox { Location = new Point(controlLeft, y), Width = 460 };
+            btnBrowseInput = new Button { Text = "...", Location = new Point(controlLeft + 470, y - 2), Width = 30 };
             btnBrowseInput.Click += BtnBrowseInput_Click;
             this.Controls.Add(txtInputFolder);
             this.Controls.Add(btnBrowseInput);
@@ -53,8 +53,8 @@ namespace VideoConverterApp
 
             // Output Folder
             AddLabel("Output Folder:", 20, y);
-            txtOutputFolder = new TextBox { Location = new Point(controlLeft, y), Width = 400 };
-            btnBrowseOutput = new Button { Text = "Browse...", Location = new Point(controlLeft + 410, y - 2), Width = 80 };
+            txtOutputFolder = new TextBox { Location = new Point(controlLeft, y), Width = 460 };
+            btnBrowseOutput = new Button { Text = "...", Location = new Point(controlLeft + 470, y - 2), Width = 30 };
             btnBrowseOutput.Click += BtnBrowseOutput_Click;
             this.Controls.Add(txtOutputFolder);
             this.Controls.Add(btnBrowseOutput);
@@ -299,6 +299,18 @@ namespace VideoConverterApp
         private async void BtnConvert_Click(object? sender, EventArgs e)
         {
             // Validate inputs
+            if (string.IsNullOrWhiteSpace(txtInputFolder.Text))
+            {
+                MessageBox.Show("Please select an input folder.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtOutputFolder.Text))
+            {
+                MessageBox.Show("Please select an output folder.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             if (!Directory.Exists(txtInputFolder.Text))
             {
                 MessageBox.Show("Input folder does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);

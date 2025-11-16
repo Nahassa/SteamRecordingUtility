@@ -4,8 +4,8 @@ namespace VideoConverterApp
 {
     public class AppSettings
     {
-        public string InputFolder { get; set; } = @"E:\Steam Recordings";
-        public string OutputFolder { get; set; } = @"E:\Steam Recordings\stretched";
+        public string InputFolder { get; set; } = string.Empty;
+        public string OutputFolder { get; set; } = string.Empty;
         public int OutputWidth { get; set; } = 1920;
         public int OutputHeight { get; set; } = 1080;
         public double Saturation { get; set; } = 1.2;
