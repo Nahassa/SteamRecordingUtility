@@ -11,7 +11,7 @@ if %ERRORLEVEL% EQU 0 (
     echo ========================================
     echo.
     echo Executable location:
-    echo bin\Release\net6.0-windows\win-x64\publish\VideoConverterApp.exe
+    echo bin\Release\net8.0-windows\win-x64\publish\VideoConverterApp.exe
     echo.
 ) else (
     echo.

@@ -22,7 +22,7 @@ First official release of the Steam Recording Video Converter!
 
 - Windows 64-bit
 - FFmpeg (in PATH or same folder as executable)
-- .NET 6.0 Runtime (if using framework-dependent build)
+- .NET 8.0 Runtime (if using framework-dependent build)
 
 ## Building the Executable
 

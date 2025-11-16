@@ -27,7 +27,7 @@ The workflow triggers on:
 ### What It Does
 
 1. **Checks out code** from the repository
-2. **Sets up .NET 6.0** SDK
+2. **Sets up .NET 8.0** SDK
 3. **Restores dependencies** (Newtonsoft.Json)
 4. **Builds the executable**:
    - Target: Windows x64

@@ -6,22 +6,22 @@ namespace VideoConverterApp
     {
         private AppSettings settings;
 
-        // UI Controls
-        private TextBox txtInputFolder;
-        private TextBox txtOutputFolder;
-        private Button btnBrowseInput;
-        private Button btnBrowseOutput;
-        private ComboBox cmbResolution;
-        private TextBox txtCustomWidth;
-        private TextBox txtCustomHeight;
-        private NumericUpDown numSaturation;
-        private NumericUpDown numCRF;
-        private NumericUpDown numBitrate;
-        private CheckBox chkMoveProcessed;
-        private Button btnConvert;
-        private RichTextBox txtLog;
-        private ProgressBar progressBar;
-        private Label lblProgress;
+        // UI Controls - Initialized in InitializeComponent()
+        private TextBox txtInputFolder = null!;
+        private TextBox txtOutputFolder = null!;
+        private Button btnBrowseInput = null!;
+        private Button btnBrowseOutput = null!;
+        private ComboBox cmbResolution = null!;
+        private TextBox txtCustomWidth = null!;
+        private TextBox txtCustomHeight = null!;
+        private NumericUpDown numSaturation = null!;
+        private NumericUpDown numCRF = null!;
+        private NumericUpDown numBitrate = null!;
+        private CheckBox chkMoveProcessed = null!;
+        private Button btnConvert = null!;
+        private RichTextBox txtLog = null!;
+        private ProgressBar progressBar = null!;
+        private Label lblProgress = null!;
 
         public MainForm()
         {

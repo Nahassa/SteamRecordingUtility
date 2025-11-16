@@ -20,14 +20,14 @@ A portable Windows application for converting Steam recordings from 4:3 format w
 ## Requirements
 
 - Windows 64-bit
-- .NET 6.0 Runtime (or use self-contained build)
+- .NET 8.0 Runtime (or use self-contained build)
 - FFmpeg (must be in PATH or same folder as executable)
 
 ## Building the Application
 
 ### Prerequisites
 
-1. Install [.NET 6.0 SDK](https://dotnet.microsoft.com/download/dotnet/6.0) or later
+1. Install [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
 
 ### Build Commands
 
@@ -40,11 +40,11 @@ cd VideoConverterApp
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=true
 ```
 
-The executable will be in: `bin/Release/net6.0-windows/win-x64/publish/VideoConverterApp.exe`
+The executable will be in: `bin/Release/net8.0-windows/win-x64/publish/VideoConverterApp.exe`
 
 #### Option 2: Framework-Dependent (Smaller file size)
 
-Requires .NET 6.0 Runtime on the target machine:
+Requires .NET 8.0 Runtime on the target machine:
 
 ```bash
 cd VideoConverterApp
