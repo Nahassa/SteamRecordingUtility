@@ -626,6 +626,13 @@ namespace VideoConverterApp
                 {
                     LogSuccess($"Successfully converted: {fileName}");
 
+                    // Move original to processed folder
+                    if (chkMoveProcessed.Checked)
+                    {
+                        File.Move(inputPath, processedPath, true);
+                        LogInfo("  Moved original to processed folder");
+                    }
+
                     // Upload to YouTube if enabled
                     if (chkEnableYouTube.Checked && youtubeUploader != null)
                     {
@@ -656,17 +663,23 @@ namespace VideoConverterApp
                         if (uploadSuccess && videoUrl != null)
                         {
                             LogSuccess($"  Uploaded to YouTube: {videoUrl}");
+
+                            // Move converted video to uploaded subfolder
+                            string uploadedFolder = Path.Combine(processedFolder, "uploaded");
+                            if (!Directory.Exists(uploadedFolder))
+                            {
+                                Directory.CreateDirectory(uploadedFolder);
+                                LogInfo("  Created uploaded folder");
+                            }
+
+                            string uploadedPath = Path.Combine(uploadedFolder, fileName);
+                            File.Move(outputPath, uploadedPath, true);
+                            LogInfo("  Moved converted video to uploaded folder");
                         }
                         else
                         {
-                            LogError("  YouTube upload failed");
+                            LogError("  YouTube upload failed - converted video kept in output folder");
                         }
-                    }
-
-                    if (chkMoveProcessed.Checked)
-                    {
-                        File.Move(inputPath, processedPath, true);
-                        LogInfo("  Moved original to processed folder");
                     }
                 }
                 else
