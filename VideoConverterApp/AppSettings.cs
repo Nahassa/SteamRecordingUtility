@@ -13,6 +13,14 @@ namespace VideoConverterApp
         public int Bitrate { get; set; } = 20000;
         public bool MoveProcessedFiles { get; set; } = true;
 
+        // YouTube Settings
+        public bool EnableYouTubeUpload { get; set; } = false;
+        public string YouTubeTitleTemplate { get; set; } = "{filename}";
+        public string YouTubeDescriptionTemplate { get; set; } = "Converted video: {filename}\nRecorded: {date}";
+        public string YouTubeTags { get; set; } = "gaming,gameplay";
+        public string YouTubePrivacyStatus { get; set; } = "private"; // private, unlisted, public
+        public string YouTubeCategoryId { get; set; } = "20"; // 20 = Gaming
+
         private static readonly string SettingsFile = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,
             "settings.json"

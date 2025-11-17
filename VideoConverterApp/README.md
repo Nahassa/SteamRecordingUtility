@@ -13,6 +13,12 @@ A portable Windows application for converting Steam recordings from 4:3 format w
   - Custom resolution
 - **Adjustable Saturation** - Slider to control color saturation (0.0 to 3.0)
 - **Quality Settings** - Configure CRF and bitrate
+- **YouTube Upload** - Automatically upload converted videos to your YouTube channel
+  - Customizable title and description templates
+  - Tag management
+  - Privacy settings (private, unlisted, public)
+  - Category selection
+  - OAuth 2.0 authentication
 - **Progress Tracking** - Visual progress bar and detailed logs
 - **Settings Persistence** - Settings saved to `settings.json` automatically
 - **Portable** - Single executable, no installation required
@@ -63,9 +69,15 @@ dotnet publish -c Release -r win-x64 --self-contained false
    - Optional: Adjust CRF (18-23 recommended) and bitrate
    - Optional: Enable "Move original files to processed folder"
 
-3. **Start Conversion** - Click "Start Conversion" button
+3. **YouTube Upload (Optional)**:
+   - Check "Upload converted videos to YouTube"
+   - Configure title template, description, tags, privacy, and category
+   - Click "Authenticate with YouTube" and follow the OAuth flow
+   - See [YOUTUBE_SETUP.md](YOUTUBE_SETUP.md) for detailed setup instructions
 
-4. **Monitor Progress** - Watch the progress bar and log window
+4. **Start Conversion** - Click "Start Conversion" button
+
+5. **Monitor Progress** - Watch the progress bar and log window
 
 ## Settings File
 

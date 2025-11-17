@@ -23,6 +23,18 @@ namespace VideoConverterApp
         private ProgressBar progressBar = null!;
         private Label lblProgress = null!;
 
+        // YouTube Controls
+        private CheckBox chkEnableYouTube = null!;
+        private TextBox txtYouTubeTitleTemplate = null!;
+        private TextBox txtYouTubeDescriptionTemplate = null!;
+        private TextBox txtYouTubeTags = null!;
+        private ComboBox cmbYouTubePrivacy = null!;
+        private ComboBox cmbYouTubeCategory = null!;
+        private Button btnYouTubeAuth = null!;
+        private Label lblYouTubeStatus = null!;
+
+        private YouTubeUploader? youtubeUploader;
+
         public MainForm()
         {
             settings = AppSettings.Load();
@@ -33,8 +45,8 @@ namespace VideoConverterApp
         private void InitializeComponent()
         {
             this.Text = "Steam Recording Video Converter";
-            this.Size = new Size(800, 700);
-            this.MinimumSize = new Size(600, 500);
+            this.Size = new Size(850, 1000);
+            this.MinimumSize = new Size(850, 900);
             this.StartPosition = FormStartPosition.CenterScreen;
 
             int y = 20;
@@ -155,6 +167,114 @@ namespace VideoConverterApp
 
             y += 40;
 
+            // YouTube section header
+            AddLabel("YouTube Upload:", 20, y, 200);
+            y += 25;
+
+            // Enable YouTube upload checkbox
+            chkEnableYouTube = new CheckBox
+            {
+                Text = "Upload converted videos to YouTube",
+                Location = new Point(20, y),
+                Width = 500
+            };
+            chkEnableYouTube.CheckedChanged += ChkEnableYouTube_CheckedChanged;
+            this.Controls.Add(chkEnableYouTube);
+
+            y += 30;
+
+            // YouTube Title Template
+            AddLabel("Title Template:", 20, y);
+            txtYouTubeTitleTemplate = new TextBox
+            {
+                Location = new Point(controlLeft, y),
+                Width = 600
+            };
+            this.Controls.Add(txtYouTubeTitleTemplate);
+
+            y += 30;
+
+            // YouTube Description Template
+            AddLabel("Description:", 20, y);
+            txtYouTubeDescriptionTemplate = new TextBox
+            {
+                Location = new Point(controlLeft, y),
+                Width = 600,
+                Height = 60,
+                Multiline = true,
+                ScrollBars = ScrollBars.Vertical
+            };
+            this.Controls.Add(txtYouTubeDescriptionTemplate);
+
+            y += 70;
+
+            // YouTube Tags
+            AddLabel("Tags:", 20, y);
+            txtYouTubeTags = new TextBox
+            {
+                Location = new Point(controlLeft, y),
+                Width = 600
+            };
+            this.Controls.Add(txtYouTubeTags);
+            AddLabel("(comma-separated)", controlLeft + 610, y + 3, 150);
+
+            y += 30;
+
+            // YouTube Privacy Status
+            AddLabel("Privacy:", 20, y);
+            cmbYouTubePrivacy = new ComboBox
+            {
+                Location = new Point(controlLeft, y),
+                Width = 150,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbYouTubePrivacy.Items.AddRange(new object[] { "private", "unlisted", "public" });
+            cmbYouTubePrivacy.SelectedIndex = 0;
+            this.Controls.Add(cmbYouTubePrivacy);
+
+            // YouTube Category
+            AddLabel("Category:", controlLeft + 160, y);
+            cmbYouTubeCategory = new ComboBox
+            {
+                Location = new Point(controlLeft + 250, y),
+                Width = 200,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbYouTubeCategory.Items.AddRange(new object[]
+            {
+                "Gaming (20)",
+                "Entertainment (24)",
+                "People & Blogs (22)",
+                "Music (10)",
+                "Science & Technology (28)"
+            });
+            cmbYouTubeCategory.SelectedIndex = 0;
+            this.Controls.Add(cmbYouTubeCategory);
+
+            y += 35;
+
+            // YouTube Auth Button
+            btnYouTubeAuth = new Button
+            {
+                Text = "Authenticate with YouTube",
+                Location = new Point(20, y),
+                Width = 200
+            };
+            btnYouTubeAuth.Click += BtnYouTubeAuth_Click;
+            this.Controls.Add(btnYouTubeAuth);
+
+            // YouTube Status Label
+            lblYouTubeStatus = new Label
+            {
+                Text = "Not authenticated",
+                Location = new Point(230, y + 3),
+                Width = 400,
+                ForeColor = Color.Gray
+            };
+            this.Controls.Add(lblYouTubeStatus);
+
+            y += 40;
+
             // Convert button
             btnConvert = new Button
             {
@@ -239,6 +359,27 @@ namespace VideoConverterApp
             numCRF.Value = settings.CRF;
             numBitrate.Value = settings.Bitrate;
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
+
+            // Load YouTube settings
+            chkEnableYouTube.Checked = settings.EnableYouTubeUpload;
+            txtYouTubeTitleTemplate.Text = settings.YouTubeTitleTemplate;
+            txtYouTubeDescriptionTemplate.Text = settings.YouTubeDescriptionTemplate;
+            txtYouTubeTags.Text = settings.YouTubeTags;
+            cmbYouTubePrivacy.Text = settings.YouTubePrivacyStatus;
+
+            // Set category based on ID
+            string categoryDisplay = settings.YouTubeCategoryId switch
+            {
+                "20" => "Gaming (20)",
+                "24" => "Entertainment (24)",
+                "22" => "People & Blogs (22)",
+                "10" => "Music (10)",
+                "28" => "Science & Technology (28)",
+                _ => "Gaming (20)"
+            };
+            cmbYouTubeCategory.Text = categoryDisplay;
+
+            UpdateYouTubeControlsEnabled();
         }
 
         private void SaveSettings()
@@ -265,6 +406,18 @@ namespace VideoConverterApp
                 settings.OutputWidth = int.Parse(parts[0]);
                 settings.OutputHeight = int.Parse(parts[1]);
             }
+
+            // Save YouTube settings
+            settings.EnableYouTubeUpload = chkEnableYouTube.Checked;
+            settings.YouTubeTitleTemplate = txtYouTubeTitleTemplate.Text;
+            settings.YouTubeDescriptionTemplate = txtYouTubeDescriptionTemplate.Text;
+            settings.YouTubeTags = txtYouTubeTags.Text;
+            settings.YouTubePrivacyStatus = cmbYouTubePrivacy.Text;
+
+            // Extract category ID from display string
+            string categoryText = cmbYouTubeCategory.Text;
+            string categoryId = categoryText.Split('(').Last().TrimEnd(')');
+            settings.YouTubeCategoryId = categoryId;
 
             settings.Save();
         }
@@ -294,6 +447,58 @@ namespace VideoConverterApp
             bool isCustom = cmbResolution.SelectedIndex == 3;
             txtCustomWidth.Visible = isCustom;
             txtCustomHeight.Visible = isCustom;
+        }
+
+        private void ChkEnableYouTube_CheckedChanged(object? sender, EventArgs e)
+        {
+            UpdateYouTubeControlsEnabled();
+        }
+
+        private void UpdateYouTubeControlsEnabled()
+        {
+            bool enabled = chkEnableYouTube.Checked;
+            txtYouTubeTitleTemplate.Enabled = enabled;
+            txtYouTubeDescriptionTemplate.Enabled = enabled;
+            txtYouTubeTags.Enabled = enabled;
+            cmbYouTubePrivacy.Enabled = enabled;
+            cmbYouTubeCategory.Enabled = enabled;
+            btnYouTubeAuth.Enabled = enabled;
+        }
+
+        private async void BtnYouTubeAuth_Click(object? sender, EventArgs e)
+        {
+            btnYouTubeAuth.Enabled = false;
+            lblYouTubeStatus.Text = "Authenticating...";
+            lblYouTubeStatus.ForeColor = Color.Gray;
+
+            try
+            {
+                youtubeUploader = new YouTubeUploader();
+                bool success = await youtubeUploader.AuthenticateAsync();
+
+                if (success)
+                {
+                    lblYouTubeStatus.Text = "Authenticated successfully!";
+                    lblYouTubeStatus.ForeColor = Color.Green;
+                    LogSuccess("YouTube authentication successful");
+                }
+                else
+                {
+                    lblYouTubeStatus.Text = "Authentication failed";
+                    lblYouTubeStatus.ForeColor = Color.Red;
+                    youtubeUploader = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                lblYouTubeStatus.Text = $"Error: {ex.Message}";
+                lblYouTubeStatus.ForeColor = Color.Red;
+                youtubeUploader = null;
+            }
+            finally
+            {
+                btnYouTubeAuth.Enabled = true;
+            }
         }
 
         private async void BtnConvert_Click(object? sender, EventArgs e)
@@ -329,6 +534,18 @@ namespace VideoConverterApp
                     "FFmpeg Required",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
+                return;
+            }
+
+            // Check YouTube settings if enabled
+            if (chkEnableYouTube.Checked && youtubeUploader == null)
+            {
+                MessageBox.Show(
+                    "YouTube upload is enabled but you haven't authenticated yet.\n\n" +
+                    "Please click 'Authenticate with YouTube' first, or disable YouTube upload.",
+                    "YouTube Authentication Required",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return;
             }
 
@@ -408,6 +625,43 @@ namespace VideoConverterApp
                 if (success)
                 {
                     LogSuccess($"Successfully converted: {fileName}");
+
+                    // Upload to YouTube if enabled
+                    if (chkEnableYouTube.Checked && youtubeUploader != null)
+                    {
+                        lblProgress.Text = $"Uploading {i + 1}/{videoFiles.Length} to YouTube: {fileName}";
+                        LogInfo("  Uploading to YouTube...");
+
+                        string title = youtubeUploader.ProcessTemplate(settings.YouTubeTitleTemplate, outputPath);
+                        string description = youtubeUploader.ProcessTemplate(settings.YouTubeDescriptionTemplate, outputPath);
+                        string[] tags = settings.YouTubeTags.Split(',').Select(t => t.Trim()).ToArray();
+
+                        var uploadProgress = new Progress<int>(percent =>
+                        {
+                            if (percent >= 0)
+                            {
+                                Invoke(() => LogInfo($"  Upload progress: {percent}%"));
+                            }
+                        });
+
+                        var (uploadSuccess, videoId, videoUrl) = await youtubeUploader.UploadVideoAsync(
+                            outputPath,
+                            title,
+                            description,
+                            tags,
+                            settings.YouTubePrivacyStatus,
+                            settings.YouTubeCategoryId,
+                            uploadProgress);
+
+                        if (uploadSuccess && videoUrl != null)
+                        {
+                            LogSuccess($"  Uploaded to YouTube: {videoUrl}");
+                        }
+                        else
+                        {
+                            LogError("  YouTube upload failed");
+                        }
+                    }
 
                     if (chkMoveProcessed.Checked)
                     {
