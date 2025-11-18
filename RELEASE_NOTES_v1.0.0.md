@@ -10,13 +10,10 @@ First official release of the Steam Recording Video Converter!
 - Configurable output resolution (1080p, 2K, 4K, or custom)
 - Adjustable saturation control (0.0 to 3.0)
 - Quality settings (CRF and bitrate)
+- YouTube upload integration with OAuth 2.0
+- Customizable video metadata (titles, descriptions, tags)
 - Real-time progress tracking with visual feedback
 - Settings automatically saved to JSON file
-
-### PowerShell Scripts
-- `Video_Converter_Script.ps1` - For use with batch file
-- `convert-videos.ps1` - Standalone version
-- Both include saturation adjustment capability
 
 ## Requirements
 
@@ -46,22 +43,25 @@ The executable will be in: `bin/Release/net6.0-windows/win-x64/publish/VideoConv
 ## Quick Start
 
 1. Download the release
-2. Build the executable (or use PowerShell scripts)
+2. Build the executable (see instructions below)
 3. Ensure FFmpeg is installed
 4. Launch the app and select your folders
 5. Adjust settings and start converting!
 
-For detailed instructions, see the [VideoConverterApp README](VideoConverterApp/README.md).
+For detailed instructions, see the [README](README.md).
 
 ## Changelog
 
 ### Added
 - GUI application with folder selection and progress tracking
-- Saturation adjustment to both PowerShell scripts
+- Saturation adjustment capability
+- YouTube upload integration with OAuth 2.0
+- Customizable video metadata templates
 - JSON settings persistence
 - Multiple resolution presets (1080p, 2K, 4K, custom)
 - Quality controls (CRF and bitrate)
 - Optional "move to processed folder" feature
+- Automatic file organization (uploaded videos moved to processed/uploaded)
 
 ### Changed
 - Application now targets x64 architecture only
