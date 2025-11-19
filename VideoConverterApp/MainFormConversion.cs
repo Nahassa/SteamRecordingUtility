@@ -189,6 +189,20 @@ ConvertAll.Enabled = false;
             }
 
             LogSuccess($"Conversion complete! Processed {videos.Count} video(s).");
+
+            // Clear all preview caches after conversion to free memory
+            foreach (var video in videoItems)
+            {
+                video.ClearPreviewCache();
+            }
+
+            // Clear PictureBox references
+            pic40Before.Image = null;
+            pic60Before.Image = null;
+            pic40After.Image = null;
+            pic60After.Image = null;
+
+            LogInfo("Cleaned up preview cache");
         }
 
         private Task<bool> RunFFmpegAsync(string arguments)

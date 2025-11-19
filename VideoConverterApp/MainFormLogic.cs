@@ -83,6 +83,19 @@ namespace VideoConverterApp
             btnLoadVideos.Enabled = false;
             lblProgress.Text = "Loading videos...";
             lstVideos.Items.Clear();
+
+            // Clear preview images from PictureBoxes to release references
+            pic40Before.Image = null;
+            pic60Before.Image = null;
+            pic40After.Image = null;
+            pic60After.Image = null;
+
+            // Dispose all cached preview images before clearing the list
+            foreach (var video in videoItems)
+            {
+                video.ClearPreviewCache();
+            }
+
             videoItems.Clear();
 
             try
