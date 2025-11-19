@@ -9,6 +9,7 @@ namespace VideoConverterApp
         private YouTubeUploader? youtubeUploader;
         private List<VideoItem> videoItems = new List<VideoItem>();
         private VideoItem? currentVideo;
+        private System.Windows.Forms.Timer? previewRefreshTimer;
 
         // Top controls
         private TextBox txtInputFolder = null!;
@@ -66,6 +67,11 @@ namespace VideoConverterApp
             settings = AppSettings.Load();
             InitializeComponent();
             LoadSettings();
+
+            // Setup auto-refresh timer (debounce slider changes)
+            previewRefreshTimer = new System.Windows.Forms.Timer();
+            previewRefreshTimer.Interval = 800; // 800ms delay after last slider change
+            previewRefreshTimer.Tick += PreviewRefreshTimer_Tick;
         }
 
         private void InitializeComponent()

@@ -84,7 +84,8 @@ dotnet publish -c Release -r win-x64 --self-contained false
    - Select a video from the list
    - View before/after preview (2 frames at 40% and 60% through the video)
    - Adjust brightness, contrast, and saturation using the sliders
-   - Click "Refresh Preview" to see changes in the after preview
+   - Preview automatically refreshes 0.8 seconds after you stop adjusting
+   - Click "Refresh Preview" to manually regenerate preview
    - Click "Apply to All" to copy current settings to all videos
    - Click "Reset" to restore default values
    - Choose output resolution from dropdown or enter custom values
@@ -139,10 +140,12 @@ Download FFmpeg from: https://www.gyan.dev/ffmpeg/builds/
 
 ## Video Conversion Details
 
-The application uses FFmpeg with the following settings:
+The application uses FFmpeg with the following optimized settings for maximum quality:
 
 - **Codec**: H.265 (libx265) for better compression
+- **Preset**: slow (better quality, slower encoding)
 - **Pixel Format**: yuv420p for maximum compatibility
+- **Scaling**: Lanczos algorithm for high-quality resampling
 - **Aspect Ratio**: Stretches 4:3 to 16:9 using `setdar`
 - **Color Adjustments**: Applied using `eq` filter with per-video settings:
   - Brightness: -1.0 to 1.0 (default 0.0 = no change)
@@ -151,9 +154,11 @@ The application uses FFmpeg with the following settings:
 - **Default CRF**: 18 (high quality)
 - **Default Bitrate**: 20000 kbps
 
+**Quality Optimization**: All video processing (scaling, aspect ratio, color adjustments) is done in a single filter chain pass to avoid multiple resampling operations that degrade quality.
+
 Example FFmpeg command:
 ```bash
-ffmpeg -i "input.mp4" -vf "setdar=16/9,eq=brightness=0.00:contrast=1.00:saturation=1.20" -c:v libx265 -pix_fmt yuv420p -crf 18 -b:v 20000k -s 1920x1080 "output.mp4"
+ffmpeg -i "input.mp4" -vf "scale=1920:1080:flags=lanczos,setdar=16/9,eq=brightness=0.00:contrast=1.00:saturation=1.20" -c:v libx265 -preset slow -pix_fmt yuv420p -crf 18 -b:v 20000k "output.mp4"
 ```
 
 ## Troubleshooting

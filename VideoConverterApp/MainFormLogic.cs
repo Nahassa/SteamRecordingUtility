@@ -254,6 +254,16 @@ namespace VideoConverterApp
             currentVideo.Saturation = trackSaturation.Value / 100.0;
 
             UpdateValueLabels();
+
+            // Auto-refresh preview after user stops adjusting (debounced)
+            previewRefreshTimer?.Stop();
+            previewRefreshTimer?.Start();
+        }
+
+        private async void PreviewRefreshTimer_Tick(object? sender, EventArgs e)
+        {
+            previewRefreshTimer?.Stop();
+            await RegenerateFilteredPreviewsAsync();
         }
 
         private void UpdateValueLabels()

@@ -107,13 +107,17 @@ namespace VideoConverterApp
                 LogInfo($"[{i + 1}/{videos.Count}] Processing: {fileName}");
                 LogInfo($"  Settings: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
 
-                // Build ffmpeg command
+                // Build ffmpeg command with optimal quality settings
                 string brightnessStr = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
                 string contrastStr = video.Contrast.ToString("0.00", CultureInfo.InvariantCulture);
                 string saturationStr = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
 
-                string vf = $"setdar=16/9,eq=brightness={brightnessStr}:contrast={contrastStr}:saturation={saturationStr}";
-                string args = $"-i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k -s {video.OutputWidth}x{video.OutputHeight} \"{outputPath}\"";
+                // Important: Do scaling in the filter chain (not with -s) to avoid double resampling
+                // Use lanczos for high-quality scaling, then apply other filters
+                string vf = $"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos,setdar=16/9,eq=brightness={brightnessStr}:contrast={contrastStr}:saturation={saturationStr}";
+
+                // Use -preset slow for better quality/compression (trades encoding time for quality)
+                string args = $"-i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
 
                 bool success = await RunFFmpegAsync(args);
 
