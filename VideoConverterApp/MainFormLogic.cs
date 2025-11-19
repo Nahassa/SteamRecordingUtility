@@ -72,7 +72,7 @@ namespace VideoConverterApp
             }
         }
 
-        private async void BtnLoadVideos_Click(object? sender, EventArgs e)
+        private void BtnLoadVideos_Click(object? sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtInputFolder.Text) || !Directory.Exists(txtInputFolder.Text))
             {
