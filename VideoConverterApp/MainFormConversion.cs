@@ -50,9 +50,7 @@ namespace VideoConverterApp
                 return;
             }
 
-            btn
-
-ConvertAll.Enabled = false;
+            btnConvertAll.Enabled = false;
             btnLoadVideos.Enabled = false;
             txtLog.Clear();
             progressBar.Value = 0;
