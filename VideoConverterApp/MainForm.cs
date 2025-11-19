@@ -1,29 +1,52 @@
 using System.Diagnostics;
+using System.Globalization;
 
 namespace VideoConverterApp
 {
-    public class MainForm : Form
+    public partial class MainForm : Form
     {
         private AppSettings settings;
+        private YouTubeUploader? youtubeUploader;
+        private List<VideoItem> videoItems = new List<VideoItem>();
+        private VideoItem? currentVideo;
 
-        // UI Controls - Initialized in InitializeComponent()
+        // Top controls
         private TextBox txtInputFolder = null!;
         private TextBox txtOutputFolder = null!;
         private Button btnBrowseInput = null!;
         private Button btnBrowseOutput = null!;
+        private Button btnLoadVideos = null!;
+        private Button btnConvertAll = null!;
+
+        // Left panel - Video list
+        private ListBox lstVideos = null!;
+
+        // Right panel - Preview and settings
+        private PictureBox pic40Before = null!;
+        private PictureBox pic40After = null!;
+        private PictureBox pic60Before = null!;
+        private PictureBox pic60After = null!;
+        private Label lbl40 = null!;
+        private Label lbl60 = null!;
+
+        // Adjustment controls
+        private TrackBar trackBrightness = null!;
+        private TrackBar trackContrast = null!;
+        private TrackBar trackSaturation = null!;
+        private Label lblBrightnessValue = null!;
+        private Label lblContrastValue = null!;
+        private Label lblSaturationValue = null!;
+        private Button btnApplyToAll = null!;
+        private Button btnReset = null!;
+        private Button btnRefreshPreview = null!;
+
+        // Resolution and quality
         private ComboBox cmbResolution = null!;
-        private TextBox txtCustomWidth = null!;
-        private TextBox txtCustomHeight = null!;
-        private NumericUpDown numSaturation = null!;
         private NumericUpDown numCRF = null!;
         private NumericUpDown numBitrate = null!;
         private CheckBox chkMoveProcessed = null!;
-        private Button btnConvert = null!;
-        private RichTextBox txtLog = null!;
-        private ProgressBar progressBar = null!;
-        private Label lblProgress = null!;
 
-        // YouTube Controls
+        // YouTube controls
         private CheckBox chkEnableYouTube = null!;
         private TextBox txtYouTubeTitleTemplate = null!;
         private TextBox txtYouTubeDescriptionTemplate = null!;
@@ -33,7 +56,10 @@ namespace VideoConverterApp
         private Button btnYouTubeAuth = null!;
         private Label lblYouTubeStatus = null!;
 
-        private YouTubeUploader? youtubeUploader;
+        // Progress
+        private ProgressBar progressBar = null!;
+        private Label lblProgress = null!;
+        private RichTextBox txtLog = null!;
 
         public MainForm()
         {
@@ -45,791 +71,539 @@ namespace VideoConverterApp
         private void InitializeComponent()
         {
             this.Text = "Steam Recording Video Converter";
-            this.Size = new Size(850, 1000);
-            this.MinimumSize = new Size(850, 900);
+            this.Size = new Size(1400, 1000);
+            this.MinimumSize = new Size(1200, 800);
             this.StartPosition = FormStartPosition.CenterScreen;
+            this.FormClosing += MainForm_FormClosing;
 
-            int y = 20;
-            int labelWidth = 120;
-            int controlLeft = labelWidth + 30;
+            int y = 10;
 
+            // Top section - Folder selection and Load Videos
+            CreateFolderSelectionSection(ref y);
+            CreateVideoListPanel(ref y);
+            CreatePreviewPanel();
+            CreateBottomSection(ref y);
+        }
+
+        private void CreateFolderSelectionSection(ref int y)
+        {
             // Input Folder
-            AddLabel("Input Folder:", 20, y);
-            txtInputFolder = new TextBox { Location = new Point(controlLeft, y), Width = 460 };
-            btnBrowseInput = new Button { Text = "...", Location = new Point(controlLeft + 470, y - 2), Width = 30 };
+            var lblInput = new Label { Text = "Input Folder:", Location = new Point(10, y + 3), Width = 80 };
+            txtInputFolder = new TextBox { Location = new Point(100, y), Width = 400 };
+            btnBrowseInput = new Button { Text = "...", Location = new Point(510, y - 2), Width = 30 };
             btnBrowseInput.Click += BtnBrowseInput_Click;
-            this.Controls.Add(txtInputFolder);
-            this.Controls.Add(btnBrowseInput);
+            this.Controls.AddRange(new Control[] { lblInput, txtInputFolder, btnBrowseInput });
+
+            y += 30;
+
+            // Output Folder
+            var lblOutput = new Label { Text = "Output Folder:", Location = new Point(10, y + 3), Width = 80 };
+            txtOutputFolder = new TextBox { Location = new Point(100, y), Width = 400 };
+            btnBrowseOutput = new Button { Text = "...", Location = new Point(510, y - 2), Width = 30 };
+            btnBrowseOutput.Click += BtnBrowseOutput_Click;
+            this.Controls.AddRange(new Control[] { lblOutput, txtOutputFolder, btnBrowseOutput });
 
             y += 35;
 
-            // Output Folder
-            AddLabel("Output Folder:", 20, y);
-            txtOutputFolder = new TextBox { Location = new Point(controlLeft, y), Width = 460 };
-            btnBrowseOutput = new Button { Text = "...", Location = new Point(controlLeft + 470, y - 2), Width = 30 };
-            btnBrowseOutput.Click += BtnBrowseOutput_Click;
-            this.Controls.Add(txtOutputFolder);
-            this.Controls.Add(btnBrowseOutput);
+            // Load Videos button
+            btnLoadVideos = new Button
+            {
+                Text = "Load Videos",
+                Location = new Point(10, y),
+                Width = 120,
+                Height = 30,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+            };
+            btnLoadVideos.Click += BtnLoadVideos_Click;
+            this.Controls.Add(btnLoadVideos);
 
             y += 40;
+        }
+
+        private void CreateVideoListPanel(ref int y)
+        {
+            var lblVideos = new Label
+            {
+                Text = "Videos:",
+                Location = new Point(10, y),
+                Width = 300,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+            };
+            this.Controls.Add(lblVideos);
+
+            y += 25;
+
+            lstVideos = new ListBox
+            {
+                Location = new Point(10, y),
+                Width = 300,
+                Height = 400,
+                Font = new Font("Consolas", 9),
+                SelectionMode = SelectionMode.One
+            };
+            lstVideos.SelectedIndexChanged += LstVideos_SelectedIndexChanged;
+            this.Controls.Add(lstVideos);
+        }
+
+        private void CreatePreviewPanel()
+        {
+            int panelLeft = 320;
+            int panelTop = 115;
+            int panelWidth = 1060;
+
+            var grpPreview = new GroupBox
+            {
+                Text = "Preview & Settings",
+                Location = new Point(panelLeft, panelTop),
+                Width = panelWidth,
+                Height = 520
+            };
+            this.Controls.Add(grpPreview);
+
+            // Preview section
+            int previewTop = 25;
+            int imgWidth = 240;
+            int imgHeight = 180;
+
+            // 40% labels and images
+            lbl40 = new Label
+            {
+                Text = "40% through video",
+                Location = new Point(10, previewTop),
+                Width = 500,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+            };
+            grpPreview.Controls.Add(lbl40);
+
+            previewTop += 20;
+
+            var lbl40Before = new Label { Text = "Before", Location = new Point(10, previewTop), Width = imgWidth };
+            var lbl40After = new Label { Text = "After", Location = new Point(10 + imgWidth + 10, previewTop), Width = imgWidth };
+            grpPreview.Controls.AddRange(new Control[] { lbl40Before, lbl40After });
+
+            previewTop += 20;
+
+            pic40Before = new PictureBox
+            {
+                Location = new Point(10, previewTop),
+                Size = new Size(imgWidth, imgHeight),
+                BorderStyle = BorderStyle.FixedSingle,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.Black
+            };
+
+            pic40After = new PictureBox
+            {
+                Location = new Point(10 + imgWidth + 10, previewTop),
+                Size = new Size(imgWidth, imgHeight),
+                BorderStyle = BorderStyle.FixedSingle,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.Black
+            };
+
+            grpPreview.Controls.AddRange(new Control[] { pic40Before, pic40After });
+
+            // 60% labels and images
+            previewTop += imgHeight + 15;
+
+            lbl60 = new Label
+            {
+                Text = "60% through video",
+                Location = new Point(10, previewTop),
+                Width = 500,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+            };
+            grpPreview.Controls.Add(lbl60);
+
+            previewTop += 20;
+
+            var lbl60Before = new Label { Text = "Before", Location = new Point(10, previewTop), Width = imgWidth };
+            var lbl60After = new Label { Text = "After", Location = new Point(10 + imgWidth + 10, previewTop), Width = imgWidth };
+            grpPreview.Controls.AddRange(new Control[] { lbl60Before, lbl60After });
+
+            previewTop += 20;
+
+            pic60Before = new PictureBox
+            {
+                Location = new Point(10, previewTop),
+                Size = new Size(imgWidth, imgHeight),
+                BorderStyle = BorderStyle.FixedSingle,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.Black
+            };
+
+            pic60After = new PictureBox
+            {
+                Location = new Point(10 + imgWidth + 10, previewTop),
+                Size = new Size(imgWidth, imgHeight),
+                BorderStyle = BorderStyle.FixedSingle,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.Black
+            };
+
+            grpPreview.Controls.AddRange(new Control[] { pic60Before, pic60After });
+
+            // Adjustment controls on the right side
+            int controlsLeft = 520;
+            int controlsTop = 25;
+            CreateAdjustmentControls(grpPreview, controlsLeft, controlsTop);
+        }
+
+        private void CreateAdjustmentControls(GroupBox parent, int left, int top)
+        {
+            int y = top;
+
+            // Brightness
+            var lblBrightness = new Label { Text = "Brightness (-1.0 to 1.0):", Location = new Point(left, y), Width = 200 };
+            parent.Controls.Add(lblBrightness);
+            y += 20;
+
+            trackBrightness = new TrackBar
+            {
+                Location = new Point(left, y),
+                Width = 300,
+                Minimum = -100,
+                Maximum = 100,
+                Value = 0,
+                TickFrequency = 10
+            };
+            trackBrightness.ValueChanged += TrackAdjustments_ValueChanged;
+            parent.Controls.Add(trackBrightness);
+
+            lblBrightnessValue = new Label
+            {
+                Text = "0.00",
+                Location = new Point(left + 310, y + 5),
+                Width = 50
+            };
+            parent.Controls.Add(lblBrightnessValue);
+
+            y += 50;
+
+            // Contrast
+            var lblContrast = new Label { Text = "Contrast (0.0 to 4.0):", Location = new Point(left, y), Width = 200 };
+            parent.Controls.Add(lblContrast);
+            y += 20;
+
+            trackContrast = new TrackBar
+            {
+                Location = new Point(left, y),
+                Width = 300,
+                Minimum = 0,
+                Maximum = 400,
+                Value = 100,
+                TickFrequency = 20
+            };
+            trackContrast.ValueChanged += TrackAdjustments_ValueChanged;
+            parent.Controls.Add(trackContrast);
+
+            lblContrastValue = new Label
+            {
+                Text = "1.00",
+                Location = new Point(left + 310, y + 5),
+                Width = 50
+            };
+            parent.Controls.Add(lblContrastValue);
+
+            y += 50;
+
+            // Saturation
+            var lblSaturation = new Label { Text = "Saturation (0.0 to 3.0):", Location = new Point(left, y), Width = 200 };
+            parent.Controls.Add(lblSaturation);
+            y += 20;
+
+            trackSaturation = new TrackBar
+            {
+                Location = new Point(left, y),
+                Width = 300,
+                Minimum = 0,
+                Maximum = 300,
+                Value = 120,
+                TickFrequency = 15
+            };
+            trackSaturation.ValueChanged += TrackAdjustments_ValueChanged;
+            parent.Controls.Add(trackSaturation);
+
+            lblSaturationValue = new Label
+            {
+                Text = "1.20",
+                Location = new Point(left + 310, y + 5),
+                Width = 50
+            };
+            parent.Controls.Add(lblSaturationValue);
+
+            y += 60;
+
+            // Refresh Preview button
+            btnRefreshPreview = new Button
+            {
+                Text = "Refresh Preview",
+                Location = new Point(left, y),
+                Width = 130
+            };
+            btnRefreshPreview.Click += BtnRefreshPreview_Click;
+            parent.Controls.Add(btnRefreshPreview);
+
+            // Apply to All button
+            btnApplyToAll = new Button
+            {
+                Text = "Apply to All Videos",
+                Location = new Point(left + 140, y),
+                Width = 140
+            };
+            btnApplyToAll.Click += BtnApplyToAll_Click;
+            parent.Controls.Add(btnApplyToAll);
+
+            y += 35;
+
+            // Reset button
+            btnReset = new Button
+            {
+                Text = "Reset to Defaults",
+                Location = new Point(left, y),
+                Width = 130
+            };
+            btnReset.Click += BtnReset_Click;
+            parent.Controls.Add(btnReset);
+
+            y += 45;
 
             // Resolution
-            AddLabel("Resolution:", 20, y);
+            var lblResolution = new Label { Text = "Output Resolution:", Location = new Point(left, y + 3), Width = 120 };
+            parent.Controls.Add(lblResolution);
+
             cmbResolution = new ComboBox
             {
-                Location = new Point(controlLeft, y),
-                Width = 150,
+                Location = new Point(left + 125, y),
+                Width = 180,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbResolution.Items.AddRange(new object[]
             {
                 "1920x1080 (Full HD)",
                 "2560x1440 (2K)",
-                "3840x2160 (4K)",
-                "Custom"
+                "3840x2160 (4K)"
             });
-            cmbResolution.SelectedIndexChanged += CmbResolution_SelectedIndexChanged;
-            this.Controls.Add(cmbResolution);
-
-            // Custom resolution fields
-            Label lblX = new Label { Text = "x", Location = new Point(controlLeft + 240, y + 3), Width = 15 };
-            txtCustomWidth = new TextBox
-            {
-                Location = new Point(controlLeft + 160, y),
-                Width = 70,
-                Visible = false
-            };
-            txtCustomHeight = new TextBox
-            {
-                Location = new Point(controlLeft + 260, y),
-                Width = 70,
-                Visible = false
-            };
-            this.Controls.Add(lblX);
-            this.Controls.Add(txtCustomWidth);
-            this.Controls.Add(txtCustomHeight);
-
-            y += 35;
-
-            // Saturation
-            AddLabel("Saturation:", 20, y);
-            numSaturation = new NumericUpDown
-            {
-                Location = new Point(controlLeft, y),
-                Width = 100,
-                Minimum = 0,
-                Maximum = 3,
-                DecimalPlaces = 2,
-                Increment = 0.1M
-            };
-            AddLabel("(1.0 = default, higher = more saturated)", controlLeft + 110, y + 3, 300);
-            this.Controls.Add(numSaturation);
+            cmbResolution.SelectedIndex = 0;
+            parent.Controls.Add(cmbResolution);
 
             y += 35;
 
             // CRF
-            AddLabel("CRF Quality:", 20, y);
+            var lblCRF = new Label { Text = "CRF Quality:", Location = new Point(left, y + 3), Width = 80 };
             numCRF = new NumericUpDown
             {
-                Location = new Point(controlLeft, y),
-                Width = 100,
+                Location = new Point(left + 85, y),
+                Width = 60,
                 Minimum = 0,
                 Maximum = 51,
                 Value = 18
             };
-            AddLabel("(lower = better quality, 18-23 recommended)", controlLeft + 110, y + 3, 350);
-            this.Controls.Add(numCRF);
+            var lblCRFHelp = new Label
+            {
+                Text = "(lower = better, 18-23 recommended)",
+                Location = new Point(left + 150, y + 3),
+                Width = 250
+            };
+            parent.Controls.AddRange(new Control[] { lblCRF, numCRF, lblCRFHelp });
 
-            y += 35;
+            y += 30;
 
             // Bitrate
-            AddLabel("Bitrate (kbps):", 20, y);
+            var lblBitrate = new Label { Text = "Bitrate (kbps):", Location = new Point(left, y + 3), Width = 85 };
             numBitrate = new NumericUpDown
             {
-                Location = new Point(controlLeft, y),
-                Width = 100,
+                Location = new Point(left + 85, y),
+                Width = 80,
                 Minimum = 1000,
                 Maximum = 100000,
-                Increment = 1000
+                Increment = 1000,
+                Value = 20000
             };
-            this.Controls.Add(numBitrate);
+            parent.Controls.AddRange(new Control[] { lblBitrate, numBitrate });
 
             y += 35;
 
-            // Move processed files checkbox
+            // Move processed checkbox
             chkMoveProcessed = new CheckBox
             {
-                Text = "Move original files to 'processed' subfolder after conversion",
-                Location = new Point(20, y),
-                Width = 500
+                Text = "Move originals to processed folder",
+                Location = new Point(left, y),
+                Width = 300
             };
-            this.Controls.Add(chkMoveProcessed);
+            parent.Controls.Add(chkMoveProcessed);
+        }
 
-            y += 40;
+        private void CreateBottomSection(ref int y)
+        {
+            y = 640;
 
-            // YouTube section header
-            AddLabel("YouTube Upload:", 20, y, 200);
-            y += 25;
+            // YouTube section (collapsed by default)
+            CreateYouTubeSection(ref y);
 
-            // Enable YouTube upload checkbox
+            y += 10;
+
+            // Convert All button
+            btnConvertAll = new Button
+            {
+                Text = "Convert All Selected Videos",
+                Location = new Point(10, y),
+                Width = 200,
+                Height = 35,
+                Font = new Font(this.Font.FontFamily, 10, FontStyle.Bold),
+                Enabled = false
+            };
+            btnConvertAll.Click += BtnConvertAll_Click;
+            this.Controls.Add(btnConvertAll);
+
+            y += 45;
+
+            // Progress
+            lblProgress = new Label
+            {
+                Text = "Ready",
+                Location = new Point(10, y),
+                Width = 1360
+            };
+            this.Controls.Add(lblProgress);
+
+            y += 20;
+
+            progressBar = new ProgressBar
+            {
+                Location = new Point(10, y),
+                Width = 1360
+            };
+            this.Controls.Add(progressBar);
+
+            y += 30;
+
+            // Log
+            var lblLog = new Label
+            {
+                Text = "Log:",
+                Location = new Point(10, y),
+                Width = 100,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+            };
+            this.Controls.Add(lblLog);
+
+            y += 20;
+
+            txtLog = new RichTextBox
+            {
+                Location = new Point(10, y),
+                Width = 1360,
+                Height = 150,
+                ReadOnly = true,
+                Font = new Font("Consolas", 9)
+            };
+            this.Controls.Add(txtLog);
+        }
+
+        private void CreateYouTubeSection(ref int y)
+        {
+            var grpYouTube = new GroupBox
+            {
+                Text = "YouTube Upload (Optional)",
+                Location = new Point(10, y),
+                Width = 1360,
+                Height = 140
+            };
+            this.Controls.Add(grpYouTube);
+
+            int innerY = 20;
+
+            // Enable checkbox
             chkEnableYouTube = new CheckBox
             {
-                Text = "Upload converted videos to YouTube",
-                Location = new Point(20, y),
-                Width = 500
+                Text = "Enable YouTube upload after conversion",
+                Location = new Point(10, innerY),
+                Width = 300
             };
             chkEnableYouTube.CheckedChanged += ChkEnableYouTube_CheckedChanged;
-            this.Controls.Add(chkEnableYouTube);
+            grpYouTube.Controls.Add(chkEnableYouTube);
 
-            y += 30;
+            innerY += 25;
 
-            // YouTube Title Template
-            AddLabel("Title Template:", 20, y);
-            txtYouTubeTitleTemplate = new TextBox
-            {
-                Location = new Point(controlLeft, y),
-                Width = 600
-            };
-            this.Controls.Add(txtYouTubeTitleTemplate);
+            // Title template
+            var lblTitle = new Label { Text = "Title:", Location = new Point(10, innerY + 3), Width = 80 };
+            txtYouTubeTitleTemplate = new TextBox { Location = new Point(95, innerY), Width = 400, Text = "{filename}" };
+            grpYouTube.Controls.AddRange(new Control[] { lblTitle, txtYouTubeTitleTemplate });
 
-            y += 30;
+            // Tags
+            var lblTags = new Label { Text = "Tags:", Location = new Point(510, innerY + 3), Width = 40 };
+            txtYouTubeTags = new TextBox { Location = new Point(555, innerY), Width = 250, Text = "gaming,gameplay" };
+            grpYouTube.Controls.AddRange(new Control[] { lblTags, txtYouTubeTags });
 
-            // YouTube Description Template
-            AddLabel("Description:", 20, y);
-            txtYouTubeDescriptionTemplate = new TextBox
-            {
-                Location = new Point(controlLeft, y),
-                Width = 600,
-                Height = 60,
-                Multiline = true,
-                ScrollBars = ScrollBars.Vertical
-            };
-            this.Controls.Add(txtYouTubeDescriptionTemplate);
-
-            y += 70;
-
-            // YouTube Tags
-            AddLabel("Tags:", 20, y);
-            txtYouTubeTags = new TextBox
-            {
-                Location = new Point(controlLeft, y),
-                Width = 600
-            };
-            this.Controls.Add(txtYouTubeTags);
-            AddLabel("(comma-separated)", controlLeft + 610, y + 3, 150);
-
-            y += 30;
-
-            // YouTube Privacy Status
-            AddLabel("Privacy:", 20, y);
+            // Privacy
+            var lblPrivacy = new Label { Text = "Privacy:", Location = new Point(820, innerY + 3), Width = 50 };
             cmbYouTubePrivacy = new ComboBox
             {
-                Location = new Point(controlLeft, y),
-                Width = 150,
+                Location = new Point(875, innerY),
+                Width = 100,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbYouTubePrivacy.Items.AddRange(new object[] { "private", "unlisted", "public" });
             cmbYouTubePrivacy.SelectedIndex = 0;
-            this.Controls.Add(cmbYouTubePrivacy);
+            grpYouTube.Controls.AddRange(new Control[] { lblPrivacy, cmbYouTubePrivacy });
 
-            // YouTube Category
-            AddLabel("Category:", controlLeft + 160, y);
+            innerY += 30;
+
+            // Description
+            var lblDesc = new Label { Text = "Description:", Location = new Point(10, innerY + 3), Width = 80 };
+            txtYouTubeDescriptionTemplate = new TextBox
+            {
+                Location = new Point(95, innerY),
+                Width = 400,
+                Height = 40,
+                Multiline = true,
+                Text = "Converted video: {filename}"
+            };
+            grpYouTube.Controls.AddRange(new Control[] { lblDesc, txtYouTubeDescriptionTemplate });
+
+            // Category
+            var lblCategory = new Label { Text = "Category:", Location = new Point(510, innerY + 3), Width = 60 };
             cmbYouTubeCategory = new ComboBox
             {
-                Location = new Point(controlLeft + 250, y),
-                Width = 200,
+                Location = new Point(575, innerY),
+                Width = 150,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbYouTubeCategory.Items.AddRange(new object[]
             {
                 "Gaming (20)",
                 "Entertainment (24)",
-                "People & Blogs (22)",
-                "Music (10)",
-                "Science & Technology (28)"
+                "People & Blogs (22)"
             });
             cmbYouTubeCategory.SelectedIndex = 0;
-            this.Controls.Add(cmbYouTubeCategory);
+            grpYouTube.Controls.AddRange(new Control[] { lblCategory, cmbYouTubeCategory });
 
-            y += 35;
-
-            // YouTube Auth Button
+            // Auth button
             btnYouTubeAuth = new Button
             {
-                Text = "Authenticate with YouTube",
-                Location = new Point(20, y),
-                Width = 200
+                Text = "Authenticate",
+                Location = new Point(820, innerY),
+                Width = 120
             };
             btnYouTubeAuth.Click += BtnYouTubeAuth_Click;
-            this.Controls.Add(btnYouTubeAuth);
+            grpYouTube.Controls.Add(btnYouTubeAuth);
 
-            // YouTube Status Label
+            // Status
             lblYouTubeStatus = new Label
             {
                 Text = "Not authenticated",
-                Location = new Point(230, y + 3),
-                Width = 400,
+                Location = new Point(950, innerY + 3),
+                Width = 300,
                 ForeColor = Color.Gray
             };
-            this.Controls.Add(lblYouTubeStatus);
-
-            y += 40;
-
-            // Convert button
-            btnConvert = new Button
-            {
-                Text = "Start Conversion",
-                Location = new Point(20, y),
-                Width = 150,
-                Height = 35,
-                Font = new Font(this.Font.FontFamily, 10, FontStyle.Bold)
-            };
-            btnConvert.Click += BtnConvert_Click;
-            this.Controls.Add(btnConvert);
-
-            y += 50;
-
-            // Progress
-            lblProgress = new Label
-            {
-                Text = "Ready",
-                Location = new Point(20, y),
-                Width = 760
-            };
-            this.Controls.Add(lblProgress);
-
-            y += 25;
-
-            progressBar = new ProgressBar
-            {
-                Location = new Point(20, y),
-                Width = 760
-            };
-            this.Controls.Add(progressBar);
-
-            y += 35;
-
-            // Log
-            AddLabel("Log:", 20, y);
-            y += 20;
-            txtLog = new RichTextBox
-            {
-                Location = new Point(20, y),
-                Width = 760,
-                Height = 200,
-                ReadOnly = true,
-                Font = new Font("Consolas", 9)
-            };
-            this.Controls.Add(txtLog);
-
-            this.FormClosing += MainForm_FormClosing;
-        }
-
-        private void AddLabel(string text, int x, int y, int width = 120)
-        {
-            Label label = new Label
-            {
-                Text = text,
-                Location = new Point(x, y + 3),
-                Width = width
-            };
-            this.Controls.Add(label);
-        }
-
-        private void LoadSettings()
-        {
-            txtInputFolder.Text = settings.InputFolder;
-            txtOutputFolder.Text = settings.OutputFolder;
-
-            // Set resolution
-            if (settings.OutputWidth == 1920 && settings.OutputHeight == 1080)
-                cmbResolution.SelectedIndex = 0;
-            else if (settings.OutputWidth == 2560 && settings.OutputHeight == 1440)
-                cmbResolution.SelectedIndex = 1;
-            else if (settings.OutputWidth == 3840 && settings.OutputHeight == 2160)
-                cmbResolution.SelectedIndex = 2;
-            else
-            {
-                cmbResolution.SelectedIndex = 3;
-                txtCustomWidth.Text = settings.OutputWidth.ToString();
-                txtCustomHeight.Text = settings.OutputHeight.ToString();
-            }
-
-            numSaturation.Value = (decimal)settings.Saturation;
-            numCRF.Value = settings.CRF;
-            numBitrate.Value = settings.Bitrate;
-            chkMoveProcessed.Checked = settings.MoveProcessedFiles;
-
-            // Load YouTube settings
-            chkEnableYouTube.Checked = settings.EnableYouTubeUpload;
-            txtYouTubeTitleTemplate.Text = settings.YouTubeTitleTemplate;
-            txtYouTubeDescriptionTemplate.Text = settings.YouTubeDescriptionTemplate;
-            txtYouTubeTags.Text = settings.YouTubeTags;
-            cmbYouTubePrivacy.Text = settings.YouTubePrivacyStatus;
-
-            // Set category based on ID
-            string categoryDisplay = settings.YouTubeCategoryId switch
-            {
-                "20" => "Gaming (20)",
-                "24" => "Entertainment (24)",
-                "22" => "People & Blogs (22)",
-                "10" => "Music (10)",
-                "28" => "Science & Technology (28)",
-                _ => "Gaming (20)"
-            };
-            cmbYouTubeCategory.Text = categoryDisplay;
+            grpYouTube.Controls.Add(lblYouTubeStatus);
 
             UpdateYouTubeControlsEnabled();
+
+            y += 150;
         }
 
-        private void SaveSettings()
-        {
-            settings.InputFolder = txtInputFolder.Text;
-            settings.OutputFolder = txtOutputFolder.Text;
-            settings.Saturation = (double)numSaturation.Value;
-            settings.CRF = (int)numCRF.Value;
-            settings.Bitrate = (int)numBitrate.Value;
-            settings.MoveProcessedFiles = chkMoveProcessed.Checked;
-
-            // Get resolution
-            if (cmbResolution.SelectedIndex == 3) // Custom
-            {
-                if (int.TryParse(txtCustomWidth.Text, out int width))
-                    settings.OutputWidth = width;
-                if (int.TryParse(txtCustomHeight.Text, out int height))
-                    settings.OutputHeight = height;
-            }
-            else
-            {
-                string resolution = cmbResolution.Text.Split(' ')[0];
-                string[] parts = resolution.Split('x');
-                settings.OutputWidth = int.Parse(parts[0]);
-                settings.OutputHeight = int.Parse(parts[1]);
-            }
-
-            // Save YouTube settings
-            settings.EnableYouTubeUpload = chkEnableYouTube.Checked;
-            settings.YouTubeTitleTemplate = txtYouTubeTitleTemplate.Text;
-            settings.YouTubeDescriptionTemplate = txtYouTubeDescriptionTemplate.Text;
-            settings.YouTubeTags = txtYouTubeTags.Text;
-            settings.YouTubePrivacyStatus = cmbYouTubePrivacy.Text;
-
-            // Extract category ID from display string
-            string categoryText = cmbYouTubeCategory.Text;
-            string categoryId = categoryText.Split('(').Last().TrimEnd(')');
-            settings.YouTubeCategoryId = categoryId;
-
-            settings.Save();
-        }
-
-        private void BtnBrowseInput_Click(object? sender, EventArgs e)
-        {
-            using FolderBrowserDialog dialog = new FolderBrowserDialog();
-            dialog.SelectedPath = txtInputFolder.Text;
-            if (dialog.ShowDialog() == DialogResult.OK)
-            {
-                txtInputFolder.Text = dialog.SelectedPath;
-            }
-        }
-
-        private void BtnBrowseOutput_Click(object? sender, EventArgs e)
-        {
-            using FolderBrowserDialog dialog = new FolderBrowserDialog();
-            dialog.SelectedPath = txtOutputFolder.Text;
-            if (dialog.ShowDialog() == DialogResult.OK)
-            {
-                txtOutputFolder.Text = dialog.SelectedPath;
-            }
-        }
-
-        private void CmbResolution_SelectedIndexChanged(object? sender, EventArgs e)
-        {
-            bool isCustom = cmbResolution.SelectedIndex == 3;
-            txtCustomWidth.Visible = isCustom;
-            txtCustomHeight.Visible = isCustom;
-        }
-
-        private void ChkEnableYouTube_CheckedChanged(object? sender, EventArgs e)
-        {
-            UpdateYouTubeControlsEnabled();
-        }
-
-        private void UpdateYouTubeControlsEnabled()
-        {
-            bool enabled = chkEnableYouTube.Checked;
-            txtYouTubeTitleTemplate.Enabled = enabled;
-            txtYouTubeDescriptionTemplate.Enabled = enabled;
-            txtYouTubeTags.Enabled = enabled;
-            cmbYouTubePrivacy.Enabled = enabled;
-            cmbYouTubeCategory.Enabled = enabled;
-            btnYouTubeAuth.Enabled = enabled;
-        }
-
-        private async void BtnYouTubeAuth_Click(object? sender, EventArgs e)
-        {
-            btnYouTubeAuth.Enabled = false;
-            lblYouTubeStatus.Text = "Authenticating...";
-            lblYouTubeStatus.ForeColor = Color.Gray;
-
-            try
-            {
-                youtubeUploader = new YouTubeUploader();
-                bool success = await youtubeUploader.AuthenticateAsync();
-
-                if (success)
-                {
-                    lblYouTubeStatus.Text = "Authenticated successfully!";
-                    lblYouTubeStatus.ForeColor = Color.Green;
-                    LogSuccess("YouTube authentication successful");
-                }
-                else
-                {
-                    lblYouTubeStatus.Text = "Authentication failed";
-                    lblYouTubeStatus.ForeColor = Color.Red;
-                    youtubeUploader = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                lblYouTubeStatus.Text = $"Error: {ex.Message}";
-                lblYouTubeStatus.ForeColor = Color.Red;
-                youtubeUploader = null;
-            }
-            finally
-            {
-                btnYouTubeAuth.Enabled = true;
-            }
-        }
-
-        private async void BtnConvert_Click(object? sender, EventArgs e)
-        {
-            // Validate inputs
-            if (string.IsNullOrWhiteSpace(txtInputFolder.Text))
-            {
-                MessageBox.Show("Please select an input folder.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(txtOutputFolder.Text))
-            {
-                MessageBox.Show("Please select an output folder.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            if (!Directory.Exists(txtInputFolder.Text))
-            {
-                MessageBox.Show("Input folder does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            // Check if FFmpeg is available
-            if (!IsFFmpegAvailable())
-            {
-                MessageBox.Show(
-                    "FFmpeg not found!\n\n" +
-                    "Please ensure ffmpeg.exe is either:\n" +
-                    "1. In your system PATH, or\n" +
-                    "2. In the same folder as this application\n\n" +
-                    "Download FFmpeg from: https://www.gyan.dev/ffmpeg/builds/",
-                    "FFmpeg Required",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-                return;
-            }
-
-            // Check YouTube settings if enabled
-            if (chkEnableYouTube.Checked && youtubeUploader == null)
-            {
-                MessageBox.Show(
-                    "YouTube upload is enabled but you haven't authenticated yet.\n\n" +
-                    "Please click 'Authenticate with YouTube' first, or disable YouTube upload.",
-                    "YouTube Authentication Required",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            SaveSettings();
-
-            btnConvert.Enabled = false;
-            txtLog.Clear();
-            progressBar.Value = 0;
-
-            try
-            {
-                await ConvertVideosAsync();
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error: {ex.Message}");
-            }
-            finally
-            {
-                btnConvert.Enabled = true;
-                lblProgress.Text = "Ready";
-            }
-        }
-
-        private async Task ConvertVideosAsync()
-        {
-            string inputFolder = txtInputFolder.Text;
-            string outputFolder = txtOutputFolder.Text;
-            string processedFolder = Path.Combine(inputFolder, "processed");
-
-            // Create directories
-            if (!Directory.Exists(outputFolder))
-            {
-                Directory.CreateDirectory(outputFolder);
-                LogInfo("Created output folder");
-            }
-
-            if (chkMoveProcessed.Checked && !Directory.Exists(processedFolder))
-            {
-                Directory.CreateDirectory(processedFolder);
-                LogInfo("Created processed folder");
-            }
-
-            // Get video files
-            var videoFiles = Directory.GetFiles(inputFolder, "*.mp4", SearchOption.TopDirectoryOnly);
-
-            if (videoFiles.Length == 0)
-            {
-                LogWarning("No video files found in input folder.");
-                return;
-            }
-
-            LogInfo($"Found {videoFiles.Length} video file(s) to process");
-            LogInfo($"Settings: {settings.OutputWidth}x{settings.OutputHeight}, Saturation: {settings.Saturation}, CRF: {settings.CRF}");
-            LogInfo("");
-
-            progressBar.Maximum = videoFiles.Length;
-            progressBar.Value = 0;
-
-            for (int i = 0; i < videoFiles.Length; i++)
-            {
-                string inputPath = videoFiles[i];
-                string fileName = Path.GetFileName(inputPath);
-                string outputPath = Path.Combine(outputFolder, fileName);
-                string processedPath = Path.Combine(processedFolder, fileName);
-
-                lblProgress.Text = $"Processing {i + 1}/{videoFiles.Length}: {fileName}";
-                LogInfo($"[{i + 1}/{videoFiles.Length}] Processing: {fileName}");
-
-                // Build ffmpeg command
-                string saturationValue = settings.Saturation.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                string vf = $"setdar=16/9,eq=saturation={saturationValue}";
-                string args = $"-i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -pix_fmt yuv420p -crf {settings.CRF} -b:v {settings.Bitrate}k -s {settings.OutputWidth}x{settings.OutputHeight} \"{outputPath}\"";
-
-                bool success = await RunFFmpegAsync(args);
-
-                if (success)
-                {
-                    LogSuccess($"Successfully converted: {fileName}");
-
-                    // Move original to processed folder
-                    if (chkMoveProcessed.Checked)
-                    {
-                        File.Move(inputPath, processedPath, true);
-                        LogInfo("  Moved original to processed folder");
-                    }
-
-                    // Upload to YouTube if enabled
-                    if (chkEnableYouTube.Checked && youtubeUploader != null)
-                    {
-                        lblProgress.Text = $"Uploading {i + 1}/{videoFiles.Length} to YouTube: {fileName}";
-                        LogInfo("  Uploading to YouTube...");
-
-                        string title = youtubeUploader.ProcessTemplate(settings.YouTubeTitleTemplate, outputPath);
-                        string description = youtubeUploader.ProcessTemplate(settings.YouTubeDescriptionTemplate, outputPath);
-                        string[] tags = settings.YouTubeTags.Split(',').Select(t => t.Trim()).ToArray();
-
-                        var uploadProgress = new Progress<int>(percent =>
-                        {
-                            if (percent >= 0)
-                            {
-                                Invoke(() => LogInfo($"  Upload progress: {percent}%"));
-                            }
-                        });
-
-                        var (uploadSuccess, videoId, videoUrl) = await youtubeUploader.UploadVideoAsync(
-                            outputPath,
-                            title,
-                            description,
-                            tags,
-                            settings.YouTubePrivacyStatus,
-                            settings.YouTubeCategoryId,
-                            uploadProgress);
-
-                        if (uploadSuccess && videoUrl != null)
-                        {
-                            LogSuccess($"  Uploaded to YouTube: {videoUrl}");
-
-                            // Move converted video to uploaded subfolder
-                            string uploadedFolder = Path.Combine(processedFolder, "uploaded");
-                            if (!Directory.Exists(uploadedFolder))
-                            {
-                                Directory.CreateDirectory(uploadedFolder);
-                                LogInfo("  Created uploaded folder");
-                            }
-
-                            string uploadedPath = Path.Combine(uploadedFolder, fileName);
-                            File.Move(outputPath, uploadedPath, true);
-                            LogInfo("  Moved converted video to uploaded folder");
-                        }
-                        else
-                        {
-                            LogError("  YouTube upload failed - converted video kept in output folder");
-                        }
-                    }
-                }
-                else
-                {
-                    LogError($"Error converting: {fileName} - original kept in place");
-                }
-
-                progressBar.Value = i + 1;
-                LogInfo("");
-            }
-
-            LogSuccess($"Conversion complete! Processed {videoFiles.Length} file(s).");
-        }
-
-        private Task<bool> RunFFmpegAsync(string arguments)
-        {
-            return Task.Run(() =>
-            {
-                try
-                {
-                    ProcessStartInfo psi = new ProcessStartInfo
-                    {
-                        FileName = "ffmpeg",
-                        Arguments = arguments,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-
-                    using Process? process = Process.Start(psi);
-                    if (process == null)
-                    {
-                        Invoke(() => LogError("Failed to start FFmpeg process"));
-                        return false;
-                    }
-
-                    // Read stderr for error messages
-                    string stderr = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                    {
-                        // Log the last few lines of stderr which usually contain the error
-                        var errorLines = stderr.Split('\n')
-                            .Where(line => !string.IsNullOrWhiteSpace(line))
-                            .TakeLast(5);
-
-                        foreach (var line in errorLines)
-                        {
-                            Invoke(() => LogError($"  {line.Trim()}"));
-                        }
-                    }
-
-                    return process.ExitCode == 0;
-                }
-                catch (Exception ex)
-                {
-                    Invoke(() => LogError($"FFmpeg error: {ex.Message}"));
-                    if (ex is System.ComponentModel.Win32Exception)
-                    {
-                        Invoke(() => LogError("FFmpeg not found. Please ensure ffmpeg.exe is in PATH or in the same folder as this application."));
-                    }
-                    return false;
-                }
-            });
-        }
-
-        private bool IsFFmpegAvailable()
-        {
-            try
-            {
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = "ffmpeg",
-                    Arguments = "-version",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-
-                using Process? process = Process.Start(psi);
-                if (process == null)
-                    return false;
-
-                process.WaitForExit();
-                return process.ExitCode == 0;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void LogInfo(string message)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(() => LogInfo(message));
-                return;
-            }
-
-            txtLog.SelectionColor = Color.Black;
-            txtLog.AppendText(message + Environment.NewLine);
-            txtLog.ScrollToCaret();
-        }
-
-        private void LogSuccess(string message)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(() => LogSuccess(message));
-                return;
-            }
-
-            txtLog.SelectionColor = Color.Green;
-            txtLog.AppendText(message + Environment.NewLine);
-            txtLog.ScrollToCaret();
-        }
-
-        private void LogWarning(string message)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(() => LogWarning(message));
-                return;
-            }
-
-            txtLog.SelectionColor = Color.Orange;
-            txtLog.AppendText(message + Environment.NewLine);
-            txtLog.ScrollToCaret();
-        }
-
-        private void LogError(string message)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(() => LogError(message));
-                return;
-            }
-
-            txtLog.SelectionColor = Color.Red;
-            txtLog.AppendText(message + Environment.NewLine);
-            txtLog.ScrollToCaret();
-        }
-
-        private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
-        {
-            SaveSettings();
-        }
+        // Event handlers and core logic to be continued...
     }
 }

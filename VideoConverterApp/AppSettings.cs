@@ -8,6 +8,8 @@ namespace VideoConverterApp
         public string OutputFolder { get; set; } = string.Empty;
         public int OutputWidth { get; set; } = 1920;
         public int OutputHeight { get; set; } = 1080;
+        public double Brightness { get; set; } = 0.0;  // -1.0 to 1.0 (default 0.0 = no change)
+        public double Contrast { get; set; } = 1.0;    // 0.0 to 4.0 (default 1.0 = no change)
         public double Saturation { get; set; } = 1.2;
         public int CRF { get; set; } = 18;
         public int Bitrate { get; set; } = 20000;
