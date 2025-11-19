@@ -17,6 +17,42 @@ namespace VideoConverterApp
         }
 
         /// <summary>
+        /// Gets the duration of a video in seconds using ffprobe
+        /// </summary>
+        private static double? GetVideoDuration(string videoPath)
+        {
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "ffprobe",
+                    Arguments = $"-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{videoPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using (Process? process = Process.Start(psi))
+                {
+                    if (process == null)
+                        return null;
+
+                    string output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+
+                    if (process.ExitCode == 0 && double.TryParse(output.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double duration))
+                    {
+                        return duration;
+                    }
+                }
+            }
+            catch { }
+
+            return null;
+        }
+
+        /// <summary>
         /// Extracts frames at specific percentages from a video
         /// </summary>
         public static async Task<(Image? frame40, Image? frame60)> ExtractFramesAsync(string videoPath)
@@ -47,11 +83,20 @@ namespace VideoConverterApp
             {
                 try
                 {
+                    // Get video duration first
+                    double? duration = GetVideoDuration(videoPath);
+                    if (duration == null || duration <= 0)
+                        return null;
+
+                    // Calculate the time position
+                    double timePosition = duration.Value * (percentage / 100.0);
+                    string timeStr = timePosition.ToString("0.00", CultureInfo.InvariantCulture);
+
                     string outputPath = Path.Combine(TempFolder, $"{Guid.NewGuid()}.jpg");
 
-                    // Use -ss with percentage to seek to specific point
+                    // Use -ss with actual time to seek to specific point
                     // -vframes 1 to extract just one frame
-                    string args = $"-ss {percentage}% -i \"{videoPath}\" -vframes 1 -q:v 2 \"{outputPath}\"";
+                    string args = $"-ss {timeStr} -i \"{videoPath}\" -vframes 1 -q:v 2 \"{outputPath}\"";
 
                     ProcessStartInfo psi = new ProcessStartInfo
                     {
@@ -68,10 +113,15 @@ namespace VideoConverterApp
                         if (process == null)
                             return null;
 
+                        string stderr = process.StandardError.ReadToEnd();
                         process.WaitForExit();
 
                         if (process.ExitCode != 0 || !File.Exists(outputPath))
+                        {
+                            // Log error for debugging
+                            System.Diagnostics.Debug.WriteLine($"FFmpeg frame extraction failed: {stderr}");
                             return null;
+                        }
                     }
 
                     // Load the image and delete the temp file
@@ -91,8 +141,9 @@ namespace VideoConverterApp
 
                     return frame;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"Frame extraction exception: {ex.Message}");
                     return null;
                 }
             });
@@ -112,6 +163,15 @@ namespace VideoConverterApp
             {
                 try
                 {
+                    // Get video duration first
+                    double? duration = GetVideoDuration(videoPath);
+                    if (duration == null || duration <= 0)
+                        return null;
+
+                    // Calculate the time position
+                    double timePosition = duration.Value * (percentage / 100.0);
+                    string timeStr = timePosition.ToString("0.00", CultureInfo.InvariantCulture);
+
                     string outputPath = Path.Combine(TempFolder, $"{Guid.NewGuid()}.jpg");
 
                     // Build filter string with invariant culture for decimal formatting
@@ -121,7 +181,7 @@ namespace VideoConverterApp
 
                     string filter = $"eq=brightness={brightnessStr}:contrast={contrastStr}:saturation={saturationStr}";
 
-                    string args = $"-ss {percentage}% -i \"{videoPath}\" -vf \"{filter}\" -vframes 1 -q:v 2 \"{outputPath}\"";
+                    string args = $"-ss {timeStr} -i \"{videoPath}\" -vf \"{filter}\" -vframes 1 -q:v 2 \"{outputPath}\"";
 
                     ProcessStartInfo psi = new ProcessStartInfo
                     {
@@ -138,10 +198,14 @@ namespace VideoConverterApp
                         if (process == null)
                             return null;
 
+                        string stderr = process.StandardError.ReadToEnd();
                         process.WaitForExit();
 
                         if (process.ExitCode != 0 || !File.Exists(outputPath))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"FFmpeg filtered frame extraction failed: {stderr}");
                             return null;
+                        }
                     }
 
                     // Load the image
@@ -161,8 +225,9 @@ namespace VideoConverterApp
 
                     return frame;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"Filtered frame extraction exception: {ex.Message}");
                     return null;
                 }
             });
