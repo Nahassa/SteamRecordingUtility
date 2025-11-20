@@ -11,18 +11,25 @@ namespace VideoConverterApp
         private VideoItem? currentVideo;
         private System.Windows.Forms.Timer? previewRefreshTimer;
 
-        // Top controls
+        // Top panel controls
+        private Panel pnlTop = null!;
         private TextBox txtInputFolder = null!;
         private TextBox txtOutputFolder = null!;
         private Button btnBrowseInput = null!;
         private Button btnBrowseOutput = null!;
         private Button btnLoadVideos = null!;
         private Button btnConvertAll = null!;
+        private Button btnYouTubeSettings = null!;
+
+        // Split containers for resizable layout
+        private SplitContainer splitMain = null!;        // Vertical: Videos | (Preview+Log)
+        private SplitContainer splitRight = null!;       // Horizontal: Preview | Log
 
         // Left panel - Video list
         private ListBox lstVideos = null!;
 
-        // Right panel - Preview and settings
+        // Preview panel controls
+        private Panel pnlPreview = null!;
         private PictureBox pic40Before = null!;
         private PictureBox pic40After = null!;
         private PictureBox pic60Before = null!;
@@ -47,7 +54,7 @@ namespace VideoConverterApp
         private NumericUpDown numBitrate = null!;
         private CheckBox chkMoveProcessed = null!;
 
-        // YouTube controls
+        // YouTube controls (for dialog)
         private CheckBox chkEnableYouTube = null!;
         private TextBox txtYouTubeTitleTemplate = null!;
         private TextBox txtYouTubeDescriptionTemplate = null!;
@@ -57,7 +64,7 @@ namespace VideoConverterApp
         private Button btnYouTubeAuth = null!;
         private Label lblYouTubeStatus = null!;
 
-        // Progress
+        // Progress and log
         private ProgressBar progressBar = null!;
         private Label lblProgress = null!;
         private RichTextBox txtLog = null!;
@@ -78,40 +85,70 @@ namespace VideoConverterApp
         {
             this.Text = "Steam Recording Video Converter";
             this.Size = new Size(1400, 1000);
-            this.MinimumSize = new Size(1200, 800);
+            this.MinimumSize = new Size(1000, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormClosing += MainForm_FormClosing;
 
-            int y = 10;
+            // Create top panel (docked, fixed height)
+            CreateTopPanel();
 
-            // Top section - Folder selection and Load Videos
-            CreateFolderSelectionSection(ref y);
-            CreateVideoListPanel(ref y);
-            CreatePreviewPanel();
-            CreateBottomSection(ref y);
+            // Create main split container layout (resizable)
+            CreateMainLayout();
         }
 
-        private void CreateFolderSelectionSection(ref int y)
+        private void CreateTopPanel()
         {
+            pnlTop = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 110,
+                Padding = new Padding(10)
+            };
+            this.Controls.Add(pnlTop);
+
+            int y = 10;
+
             // Input Folder
-            var lblInput = new Label { Text = "Input Folder:", Location = new Point(10, y + 3), Width = 80 };
-            txtInputFolder = new TextBox { Location = new Point(100, y), Width = 400 };
-            btnBrowseInput = new Button { Text = "...", Location = new Point(510, y - 2), Width = 30 };
+            var lblInput = new Label { Text = "Input Folder:", Location = new Point(10, y + 3), Width = 90 };
+            txtInputFolder = new TextBox
+            {
+                Location = new Point(105, y),
+                Width = 500,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            btnBrowseInput = new Button
+            {
+                Text = "...",
+                Width = 30,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnBrowseInput.Location = new Point(txtInputFolder.Right + 5, y - 2);
             btnBrowseInput.Click += BtnBrowseInput_Click;
-            this.Controls.AddRange(new Control[] { lblInput, txtInputFolder, btnBrowseInput });
+            pnlTop.Controls.AddRange(new Control[] { lblInput, txtInputFolder, btnBrowseInput });
 
             y += 30;
 
             // Output Folder
-            var lblOutput = new Label { Text = "Output Folder:", Location = new Point(10, y + 3), Width = 80 };
-            txtOutputFolder = new TextBox { Location = new Point(100, y), Width = 400 };
-            btnBrowseOutput = new Button { Text = "...", Location = new Point(510, y - 2), Width = 30 };
+            var lblOutput = new Label { Text = "Output Folder:", Location = new Point(10, y + 3), Width = 90 };
+            txtOutputFolder = new TextBox
+            {
+                Location = new Point(105, y),
+                Width = 500,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            btnBrowseOutput = new Button
+            {
+                Text = "...",
+                Width = 30,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnBrowseOutput.Location = new Point(txtOutputFolder.Right + 5, y - 2);
             btnBrowseOutput.Click += BtnBrowseOutput_Click;
-            this.Controls.AddRange(new Control[] { lblOutput, txtOutputFolder, btnBrowseOutput });
+            pnlTop.Controls.AddRange(new Control[] { lblOutput, txtOutputFolder, btnBrowseOutput });
 
             y += 35;
 
-            // Load Videos button
+            // Buttons
             btnLoadVideos = new Button
             {
                 Text = "Load Videos",
@@ -121,62 +158,117 @@ namespace VideoConverterApp
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
             };
             btnLoadVideos.Click += BtnLoadVideos_Click;
-            this.Controls.Add(btnLoadVideos);
 
-            y += 40;
+            btnConvertAll = new Button
+            {
+                Text = "Convert All",
+                Location = new Point(140, y),
+                Width = 120,
+                Height = 30,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
+                Enabled = false
+            };
+            btnConvertAll.Click += BtnConvertAll_Click;
+
+            btnYouTubeSettings = new Button
+            {
+                Text = "YouTube Settings...",
+                Location = new Point(270, y),
+                Width = 140,
+                Height = 30
+            };
+            btnYouTubeSettings.Click += BtnYouTubeSettings_Click;
+
+            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnYouTubeSettings });
         }
 
-        private void CreateVideoListPanel(ref int y)
+        private void CreateMainLayout()
+        {
+            // Main horizontal split: Videos (left) | Preview+Log (right)
+            splitMain = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                SplitterDistance = 300,
+                BorderStyle = BorderStyle.Fixed3D,
+                FixedPanel = FixedPanel.Panel1  // Keep video list fixed width when resizing
+            };
+            this.Controls.Add(splitMain);
+
+            // Left panel: Video list
+            CreateVideoListPanel();
+
+            // Right side: Vertical split (Preview | Log)
+            splitRight = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Horizontal,
+                SplitterDistance = 550,
+                BorderStyle = BorderStyle.None
+            };
+            splitMain.Panel2.Controls.Add(splitRight);
+
+            // Top of right: Preview and settings
+            CreatePreviewPanel();
+
+            // Bottom of right: Progress and log (resizable!)
+            CreateLogPanel();
+        }
+
+        private void CreateVideoListPanel()
         {
             var lblVideos = new Label
             {
-                Text = "Videos:",
-                Location = new Point(10, y),
-                Width = 300,
-                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+                Text = "Videos",
+                Dock = DockStyle.Top,
+                Height = 25,
+                Font = new Font(this.Font.FontFamily, 10, FontStyle.Bold),
+                Padding = new Padding(5),
+                TextAlign = ContentAlignment.MiddleLeft
             };
-            this.Controls.Add(lblVideos);
-
-            y += 25;
 
             lstVideos = new ListBox
             {
-                Location = new Point(10, y),
-                Width = 300,
-                Height = 400,
+                Dock = DockStyle.Fill,
                 Font = new Font("Consolas", 9),
                 SelectionMode = SelectionMode.One
             };
             lstVideos.SelectedIndexChanged += LstVideos_SelectedIndexChanged;
-            this.Controls.Add(lstVideos);
+
+            splitMain.Panel1.Controls.AddRange(new Control[] { lstVideos, lblVideos });
         }
 
         private void CreatePreviewPanel()
         {
-            int panelLeft = 320;
-            int panelTop = 115;
-            int panelWidth = 1060;
+            pnlPreview = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                Padding = new Padding(5)
+            };
+            splitRight.Panel1.Controls.Add(pnlPreview);
 
             var grpPreview = new GroupBox
             {
                 Text = "Preview & Settings",
-                Location = new Point(panelLeft, panelTop),
-                Width = panelWidth,
-                Height = 520
+                Location = new Point(5, 5),
+                Width = 1040,
+                Height = 490,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            this.Controls.Add(grpPreview);
+            pnlPreview.Controls.Add(grpPreview);
 
-            // Preview section
+            // Preview images layout
             int previewTop = 25;
-            int imgWidth = 240;
-            int imgHeight = 180;
+            int imgWidth = 220;
+            int imgHeight = 165;
 
-            // 40% labels and images
+            // 40% through video
             lbl40 = new Label
             {
                 Text = "40% through video",
                 Location = new Point(10, previewTop),
-                Width = 500,
+                Width = 450,
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
             };
             grpPreview.Controls.Add(lbl40);
@@ -209,14 +301,14 @@ namespace VideoConverterApp
 
             grpPreview.Controls.AddRange(new Control[] { pic40Before, pic40After });
 
-            // 60% labels and images
+            // 60% through video
             previewTop += imgHeight + 15;
 
             lbl60 = new Label
             {
                 Text = "60% through video",
                 Location = new Point(10, previewTop),
-                Width = 500,
+                Width = 450,
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
             };
             grpPreview.Controls.Add(lbl60);
@@ -249,8 +341,8 @@ namespace VideoConverterApp
 
             grpPreview.Controls.AddRange(new Control[] { pic60Before, pic60After });
 
-            // Adjustment controls on the right side
-            int controlsLeft = 520;
+            // Controls on the right side
+            int controlsLeft = 470;
             int controlsTop = 25;
             CreateAdjustmentControls(grpPreview, controlsLeft, controlsTop);
         }
@@ -258,358 +350,216 @@ namespace VideoConverterApp
         private void CreateAdjustmentControls(GroupBox parent, int left, int top)
         {
             int y = top;
+            int labelWidth = 80;
+            int trackWidth = 200;
 
             // Brightness
-            var lblBrightness = new Label { Text = "Brightness (-1.0 to 1.0):", Location = new Point(left, y), Width = 200 };
-            parent.Controls.Add(lblBrightness);
-            y += 20;
-
+            var lblBrightness = new Label { Text = "Brightness:", Location = new Point(left, y + 3), Width = labelWidth };
             trackBrightness = new TrackBar
             {
-                Location = new Point(left, y),
-                Width = 300,
+                Location = new Point(left + labelWidth, y),
+                Width = trackWidth,
                 Minimum = -100,
                 Maximum = 100,
                 Value = 0,
-                TickFrequency = 10
+                TickFrequency = 20
             };
             trackBrightness.ValueChanged += TrackAdjustments_ValueChanged;
-            parent.Controls.Add(trackBrightness);
 
             lblBrightnessValue = new Label
             {
-                Text = "0.00",
-                Location = new Point(left + 310, y + 5),
-                Width = 50
+                Location = new Point(left + labelWidth + trackWidth + 5, y + 3),
+                Width = 50,
+                Text = "0.00"
             };
-            parent.Controls.Add(lblBrightnessValue);
 
+            parent.Controls.AddRange(new Control[] { lblBrightness, trackBrightness, lblBrightnessValue });
             y += 50;
 
             // Contrast
-            var lblContrast = new Label { Text = "Contrast (0.0 to 4.0):", Location = new Point(left, y), Width = 200 };
-            parent.Controls.Add(lblContrast);
-            y += 20;
-
+            var lblContrast = new Label { Text = "Contrast:", Location = new Point(left, y + 3), Width = labelWidth };
             trackContrast = new TrackBar
             {
-                Location = new Point(left, y),
-                Width = 300,
+                Location = new Point(left + labelWidth, y),
+                Width = trackWidth,
                 Minimum = 0,
                 Maximum = 400,
                 Value = 100,
-                TickFrequency = 20
+                TickFrequency = 50
             };
             trackContrast.ValueChanged += TrackAdjustments_ValueChanged;
-            parent.Controls.Add(trackContrast);
 
             lblContrastValue = new Label
             {
-                Text = "1.00",
-                Location = new Point(left + 310, y + 5),
-                Width = 50
+                Location = new Point(left + labelWidth + trackWidth + 5, y + 3),
+                Width = 50,
+                Text = "1.00"
             };
-            parent.Controls.Add(lblContrastValue);
 
+            parent.Controls.AddRange(new Control[] { lblContrast, trackContrast, lblContrastValue });
             y += 50;
 
             // Saturation
-            var lblSaturation = new Label { Text = "Saturation (0.0 to 3.0):", Location = new Point(left, y), Width = 200 };
-            parent.Controls.Add(lblSaturation);
-            y += 20;
-
+            var lblSaturation = new Label { Text = "Saturation:", Location = new Point(left, y + 3), Width = labelWidth };
             trackSaturation = new TrackBar
             {
-                Location = new Point(left, y),
-                Width = 300,
+                Location = new Point(left + labelWidth, y),
+                Width = trackWidth,
                 Minimum = 0,
                 Maximum = 300,
                 Value = 120,
-                TickFrequency = 15
+                TickFrequency = 30
             };
             trackSaturation.ValueChanged += TrackAdjustments_ValueChanged;
-            parent.Controls.Add(trackSaturation);
 
             lblSaturationValue = new Label
             {
-                Text = "1.20",
-                Location = new Point(left + 310, y + 5),
-                Width = 50
+                Location = new Point(left + labelWidth + trackWidth + 5, y + 3),
+                Width = 50,
+                Text = "1.20"
             };
-            parent.Controls.Add(lblSaturationValue);
 
-            y += 60;
+            parent.Controls.AddRange(new Control[] { lblSaturation, trackSaturation, lblSaturationValue });
+            y += 50;
 
-            // Refresh Preview button
+            // Buttons
             btnRefreshPreview = new Button
             {
                 Text = "Refresh Preview",
                 Location = new Point(left, y),
-                Width = 130
+                Width = 120,
+                Height = 25
             };
             btnRefreshPreview.Click += BtnRefreshPreview_Click;
-            parent.Controls.Add(btnRefreshPreview);
 
-            // Apply to All button
             btnApplyToAll = new Button
             {
-                Text = "Apply to All Videos",
-                Location = new Point(left + 140, y),
-                Width = 140
+                Text = "Apply to All",
+                Location = new Point(left + 130, y),
+                Width = 100,
+                Height = 25
             };
             btnApplyToAll.Click += BtnApplyToAll_Click;
-            parent.Controls.Add(btnApplyToAll);
 
-            y += 35;
-
-            // Reset button
             btnReset = new Button
             {
-                Text = "Reset to Defaults",
-                Location = new Point(left, y),
-                Width = 130
+                Text = "Reset",
+                Location = new Point(left + 240, y),
+                Width = 80,
+                Height = 25
             };
             btnReset.Click += BtnReset_Click;
-            parent.Controls.Add(btnReset);
 
-            y += 45;
-
-            // Resolution
-            var lblResolution = new Label { Text = "Output Resolution:", Location = new Point(left, y + 3), Width = 120 };
-            parent.Controls.Add(lblResolution);
-
-            cmbResolution = new ComboBox
-            {
-                Location = new Point(left + 125, y),
-                Width = 180,
-                DropDownStyle = ComboBoxStyle.DropDownList
-            };
-            cmbResolution.Items.AddRange(new object[]
-            {
-                "1920x1080 (Full HD)",
-                "2560x1440 (2K)",
-                "3840x2160 (4K)"
-            });
-            cmbResolution.SelectedIndex = 0;
-            parent.Controls.Add(cmbResolution);
-
+            parent.Controls.AddRange(new Control[] { btnRefreshPreview, btnApplyToAll, btnReset });
             y += 35;
 
-            // CRF
-            var lblCRF = new Label { Text = "CRF Quality:", Location = new Point(left, y + 3), Width = 80 };
+            // Resolution and quality settings
+            var lblResolution = new Label { Text = "Resolution:", Location = new Point(left, y + 3), Width = labelWidth };
+            cmbResolution = new ComboBox
+            {
+                Location = new Point(left + labelWidth, y),
+                Width = 150,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbResolution.Items.AddRange(new[] { "1920x1080 (Full HD)", "2560x1440 (2K)", "3840x2160 (4K)", "Custom" });
+            cmbResolution.SelectedIndex = 0;
+
+            parent.Controls.AddRange(new Control[] { lblResolution, cmbResolution });
+            y += 35;
+
+            var lblCRF = new Label { Text = "CRF:", Location = new Point(left, y + 3), Width = labelWidth };
             numCRF = new NumericUpDown
             {
-                Location = new Point(left + 85, y),
+                Location = new Point(left + labelWidth, y),
                 Width = 60,
                 Minimum = 0,
                 Maximum = 51,
                 Value = 18
             };
-            var lblCRFHelp = new Label
-            {
-                Text = "(lower = better, 18-23 recommended)",
-                Location = new Point(left + 150, y + 3),
-                Width = 250
-            };
-            parent.Controls.AddRange(new Control[] { lblCRF, numCRF, lblCRFHelp });
 
-            y += 30;
-
-            // Bitrate
-            var lblBitrate = new Label { Text = "Bitrate (kbps):", Location = new Point(left, y + 3), Width = 85 };
+            var lblBitrate = new Label { Text = "Bitrate (kbps):", Location = new Point(left + 160, y + 3), Width = 90 };
             numBitrate = new NumericUpDown
             {
-                Location = new Point(left + 85, y),
+                Location = new Point(left + 250, y),
                 Width = 80,
                 Minimum = 1000,
                 Maximum = 100000,
-                Increment = 1000,
-                Value = 20000
+                Value = 20000,
+                Increment = 1000
             };
-            parent.Controls.AddRange(new Control[] { lblBitrate, numBitrate });
 
+            parent.Controls.AddRange(new Control[] { lblCRF, numCRF, lblBitrate, numBitrate });
             y += 35;
 
-            // Move processed checkbox
             chkMoveProcessed = new CheckBox
             {
-                Text = "Move originals to processed folder",
+                Text = "Move original files to processed folder",
                 Location = new Point(left, y),
-                Width = 300
+                Width = 300,
+                Checked = true
             };
+
             parent.Controls.Add(chkMoveProcessed);
         }
 
-        private void CreateBottomSection(ref int y)
+        private void CreateLogPanel()
         {
-            y = 640;
-
-            // YouTube section (collapsed by default)
-            CreateYouTubeSection(ref y);
-
-            y += 10;
-
-            // Convert All button
-            btnConvertAll = new Button
+            var pnlLog = new Panel
             {
-                Text = "Convert All Selected Videos",
-                Location = new Point(10, y),
-                Width = 200,
-                Height = 35,
-                Font = new Font(this.Font.FontFamily, 10, FontStyle.Bold),
-                Enabled = false
+                Dock = DockStyle.Fill,
+                Padding = new Padding(5)
             };
-            btnConvertAll.Click += BtnConvertAll_Click;
-            this.Controls.Add(btnConvertAll);
+            splitRight.Panel2.Controls.Add(pnlLog);
 
-            y += 45;
+            var lblLog = new Label
+            {
+                Text = "Log (Drag divider above to resize)",
+                Dock = DockStyle.Top,
+                Height = 20,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
+                ForeColor = Color.DarkBlue
+            };
+            pnlLog.Controls.Add(lblLog);
 
-            // Progress
             lblProgress = new Label
             {
+                Dock = DockStyle.Top,
+                Height = 20,
                 Text = "Ready",
-                Location = new Point(10, y),
-                Width = 1360
+                Padding = new Padding(0, 2, 0, 0)
             };
-            this.Controls.Add(lblProgress);
-
-            y += 20;
+            pnlLog.Controls.Add(lblProgress);
 
             progressBar = new ProgressBar
             {
-                Location = new Point(10, y),
-                Width = 1360
+                Dock = DockStyle.Top,
+                Height = 20,
+                Style = ProgressBarStyle.Continuous
             };
-            this.Controls.Add(progressBar);
-
-            y += 30;
-
-            // Log
-            var lblLog = new Label
-            {
-                Text = "Log:",
-                Location = new Point(10, y),
-                Width = 100,
-                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
-            };
-            this.Controls.Add(lblLog);
-
-            y += 20;
+            pnlLog.Controls.Add(progressBar);
 
             txtLog = new RichTextBox
             {
-                Location = new Point(10, y),
-                Width = 1360,
-                Height = 150,
+                Dock = DockStyle.Fill,
                 ReadOnly = true,
-                Font = new Font("Consolas", 9)
+                Font = new Font("Consolas", 9),
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle
             };
-            this.Controls.Add(txtLog);
+            pnlLog.Controls.Add(txtLog);
         }
 
-        private void CreateYouTubeSection(ref int y)
+        private void BtnYouTubeSettings_Click(object? sender, EventArgs e)
         {
-            var grpYouTube = new GroupBox
+            // Open YouTube settings in a separate dialog
+            using var dlg = new YouTubeSettingsDialog(settings, youtubeUploader);
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                Text = "YouTube Upload (Optional)",
-                Location = new Point(10, y),
-                Width = 1360,
-                Height = 140
-            };
-            this.Controls.Add(grpYouTube);
-
-            int innerY = 20;
-
-            // Enable checkbox
-            chkEnableYouTube = new CheckBox
-            {
-                Text = "Enable YouTube upload after conversion",
-                Location = new Point(10, innerY),
-                Width = 300
-            };
-            chkEnableYouTube.CheckedChanged += ChkEnableYouTube_CheckedChanged;
-            grpYouTube.Controls.Add(chkEnableYouTube);
-
-            innerY += 25;
-
-            // Title template
-            var lblTitle = new Label { Text = "Title:", Location = new Point(10, innerY + 3), Width = 80 };
-            txtYouTubeTitleTemplate = new TextBox { Location = new Point(95, innerY), Width = 400, Text = "{filename}" };
-            grpYouTube.Controls.AddRange(new Control[] { lblTitle, txtYouTubeTitleTemplate });
-
-            // Tags
-            var lblTags = new Label { Text = "Tags:", Location = new Point(510, innerY + 3), Width = 40 };
-            txtYouTubeTags = new TextBox { Location = new Point(555, innerY), Width = 250, Text = "gaming,gameplay" };
-            grpYouTube.Controls.AddRange(new Control[] { lblTags, txtYouTubeTags });
-
-            // Privacy
-            var lblPrivacy = new Label { Text = "Privacy:", Location = new Point(820, innerY + 3), Width = 50 };
-            cmbYouTubePrivacy = new ComboBox
-            {
-                Location = new Point(875, innerY),
-                Width = 100,
-                DropDownStyle = ComboBoxStyle.DropDownList
-            };
-            cmbYouTubePrivacy.Items.AddRange(new object[] { "private", "unlisted", "public" });
-            cmbYouTubePrivacy.SelectedIndex = 0;
-            grpYouTube.Controls.AddRange(new Control[] { lblPrivacy, cmbYouTubePrivacy });
-
-            innerY += 30;
-
-            // Description
-            var lblDesc = new Label { Text = "Description:", Location = new Point(10, innerY + 3), Width = 80 };
-            txtYouTubeDescriptionTemplate = new TextBox
-            {
-                Location = new Point(95, innerY),
-                Width = 400,
-                Height = 40,
-                Multiline = true,
-                Text = "Converted video: {filename}"
-            };
-            grpYouTube.Controls.AddRange(new Control[] { lblDesc, txtYouTubeDescriptionTemplate });
-
-            // Category
-            var lblCategory = new Label { Text = "Category:", Location = new Point(510, innerY + 3), Width = 60 };
-            cmbYouTubeCategory = new ComboBox
-            {
-                Location = new Point(575, innerY),
-                Width = 150,
-                DropDownStyle = ComboBoxStyle.DropDownList
-            };
-            cmbYouTubeCategory.Items.AddRange(new object[]
-            {
-                "Gaming (20)",
-                "Entertainment (24)",
-                "People & Blogs (22)"
-            });
-            cmbYouTubeCategory.SelectedIndex = 0;
-            grpYouTube.Controls.AddRange(new Control[] { lblCategory, cmbYouTubeCategory });
-
-            // Auth button
-            btnYouTubeAuth = new Button
-            {
-                Text = "Authenticate",
-                Location = new Point(820, innerY),
-                Width = 120
-            };
-            btnYouTubeAuth.Click += BtnYouTubeAuth_Click;
-            grpYouTube.Controls.Add(btnYouTubeAuth);
-
-            // Status
-            lblYouTubeStatus = new Label
-            {
-                Text = "Not authenticated",
-                Location = new Point(950, innerY + 3),
-                Width = 300,
-                ForeColor = Color.Gray
-            };
-            grpYouTube.Controls.Add(lblYouTubeStatus);
-
-            UpdateYouTubeControlsEnabled();
-
-            y += 150;
+                youtubeUploader = dlg.YouTubeUploader;
+                SaveSettings();
+            }
         }
 
-        // Event handlers and core logic to be continued...
+        // Event handlers and core logic continued in partial classes...
     }
 }

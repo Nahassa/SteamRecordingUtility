@@ -13,21 +13,7 @@ namespace VideoConverterApp
             numBitrate.Value = settings.Bitrate;
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
-            // Load YouTube settings
-            chkEnableYouTube.Checked = settings.EnableYouTubeUpload;
-            txtYouTubeTitleTemplate.Text = settings.YouTubeTitleTemplate;
-            txtYouTubeDescriptionTemplate.Text = settings.YouTubeDescriptionTemplate;
-            txtYouTubeTags.Text = settings.YouTubeTags;
-            cmbYouTubePrivacy.Text = settings.YouTubePrivacyStatus;
-
-            string categoryDisplay = settings.YouTubeCategoryId switch
-            {
-                "20" => "Gaming (20)",
-                "24" => "Entertainment (24)",
-                "22" => "People & Blogs (22)",
-                _ => "Gaming (20)"
-            };
-            cmbYouTubeCategory.Text = categoryDisplay;
+            // YouTube settings are now handled in the YouTubeSettingsDialog
         }
 
         private void SaveSettings()
@@ -38,17 +24,7 @@ namespace VideoConverterApp
             settings.Bitrate = (int)numBitrate.Value;
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
 
-            // YouTube settings
-            settings.EnableYouTubeUpload = chkEnableYouTube.Checked;
-            settings.YouTubeTitleTemplate = txtYouTubeTitleTemplate.Text;
-            settings.YouTubeDescriptionTemplate = txtYouTubeDescriptionTemplate.Text;
-            settings.YouTubeTags = txtYouTubeTags.Text;
-            settings.YouTubePrivacyStatus = cmbYouTubePrivacy.Text;
-
-            string categoryText = cmbYouTubeCategory.Text;
-            string categoryId = categoryText.Split('(').Last().TrimEnd(')');
-            settings.YouTubeCategoryId = categoryId;
-
+            // YouTube settings are saved by the YouTubeSettingsDialog
             settings.Save();
         }
 
@@ -328,58 +304,6 @@ namespace VideoConverterApp
             trackSaturation.Value = 120;
 
             UpdateValueLabels();
-        }
-
-        private void ChkEnableYouTube_CheckedChanged(object? sender, EventArgs e)
-        {
-            UpdateYouTubeControlsEnabled();
-        }
-
-        private void UpdateYouTubeControlsEnabled()
-        {
-            bool enabled = chkEnableYouTube.Checked;
-            txtYouTubeTitleTemplate.Enabled = enabled;
-            txtYouTubeDescriptionTemplate.Enabled = enabled;
-            txtYouTubeTags.Enabled = enabled;
-            cmbYouTubePrivacy.Enabled = enabled;
-            cmbYouTubeCategory.Enabled = enabled;
-            btnYouTubeAuth.Enabled = enabled;
-        }
-
-        private async void BtnYouTubeAuth_Click(object? sender, EventArgs e)
-        {
-            btnYouTubeAuth.Enabled = false;
-            lblYouTubeStatus.Text = "Authenticating...";
-            lblYouTubeStatus.ForeColor = Color.Gray;
-
-            try
-            {
-                youtubeUploader = new YouTubeUploader();
-                bool success = await youtubeUploader.AuthenticateAsync();
-
-                if (success)
-                {
-                    lblYouTubeStatus.Text = "Authenticated successfully!";
-                    lblYouTubeStatus.ForeColor = Color.Green;
-                    LogSuccess("YouTube authentication successful");
-                }
-                else
-                {
-                    lblYouTubeStatus.Text = "Authentication failed";
-                    lblYouTubeStatus.ForeColor = Color.Red;
-                    youtubeUploader = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                lblYouTubeStatus.Text = $"Error: {ex.Message}";
-                lblYouTubeStatus.ForeColor = Color.Red;
-                youtubeUploader = null;
-            }
-            finally
-            {
-                btnYouTubeAuth.Enabled = true;
-            }
         }
 
         // Conversion logic continues in next file...
