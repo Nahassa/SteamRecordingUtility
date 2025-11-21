@@ -109,13 +109,27 @@ namespace VideoConverterApp
             if (e.CloseReason == CloseReason.UserClosing)
             {
                 e.Cancel = true;
-                this.Hide();
+                HideAndActivateOwner();
             }
         }
 
         private void BtnClose_Click(object? sender, EventArgs e)
         {
+            HideAndActivateOwner();
+        }
+
+        /// <summary>
+        /// Hide this dialog and activate the owner form (best practice for modeless dialogs)
+        /// </summary>
+        private void HideAndActivateOwner()
+        {
             this.Hide();
+
+            // Activate the owner form so user returns to main app, not previous app
+            if (this.Owner != null)
+            {
+                this.Owner.Activate();
+            }
         }
 
         private void BtnCopy_Click(object? sender, EventArgs e)

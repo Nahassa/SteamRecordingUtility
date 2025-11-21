@@ -102,6 +102,7 @@ namespace VideoConverterApp
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormClosing += MainForm_FormClosing;
             this.Resize += MainForm_Resize;
+            this.Activated += MainForm_Activated;
 
             // Create main split container layout FIRST (will dock Fill)
             CreateMainLayout();
@@ -698,6 +699,17 @@ namespace VideoConverterApp
         {
             // Update top panel button positions when resizing
             UpdateTopPanelButtonPositions();
+        }
+
+        private void MainForm_Activated(object? sender, EventArgs e)
+        {
+            // When main form is activated (clicked from taskbar or another app),
+            // bring the log dialog to front too if it's visible (best practice for owned windows)
+            if (logDialog != null && logDialog.Visible)
+            {
+                // Bring log dialog to front without stealing focus from main form
+                logDialog.BringToFront();
+            }
         }
 
         private void BtnSettings_Click(object? sender, EventArgs e)

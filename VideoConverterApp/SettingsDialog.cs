@@ -39,11 +39,12 @@ namespace VideoConverterApp
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(500, 480);
+            this.Size = new Size(500, 510);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
+            this.Padding = new Padding(0, 0, 0, 10);
 
             int y = 15;
             int labelWidth = 120;
