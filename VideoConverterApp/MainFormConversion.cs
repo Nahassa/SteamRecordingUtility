@@ -222,8 +222,8 @@ namespace VideoConverterApp
                         Arguments = arguments,
                         UseShellExecute = false,
                         CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
+                        RedirectStandardOutput = false, // Don't redirect stdout - prevents deadlock
+                        RedirectStandardError = true    // FFmpeg outputs progress/errors to stderr
                     };
 
                     using Process? process = Process.Start(psi);
