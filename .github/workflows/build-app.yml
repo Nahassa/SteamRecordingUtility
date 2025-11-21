@@ -1,0 +1,68 @@
+name: Build VideoConverterApp
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'VideoConverterApp/**'
+      - '.github/workflows/build-app.yml'
+  pull_request:
+    paths:
+      - 'VideoConverterApp/**'
+  release:
+    types: [created, published]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore VideoConverterApp/VideoConverterApp.csproj
+
+    - name: Build application
+      run: dotnet publish VideoConverterApp/VideoConverterApp.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=true -o build/
+
+    - name: Get version from tag or commit
+      id: get_version
+      shell: pwsh
+      run: |
+        if ($env:GITHUB_REF -match 'refs/tags/v(.+)') {
+          $version = $matches[1]
+        } else {
+          $version = $env:GITHUB_SHA.Substring(0,7)
+        }
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Version: $version"
+
+    - name: Rename executable with version
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        Copy-Item "build/VideoConverterApp.exe" "build/VideoConverterApp-$version-win-x64.exe"
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VideoConverterApp-${{ steps.get_version.outputs.VERSION }}
+        path: build/VideoConverterApp-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
+        retention-days: 30
+
+    - name: Upload to release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/VideoConverterApp-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
