@@ -17,9 +17,11 @@ namespace VideoConverterApp
         private TextBox txtOutputFolder = null!;
         private Button btnBrowseInput = null!;
         private Button btnBrowseOutput = null!;
+        private Button btnSettings = null!;
+        private Button btnYouTubeSettings = null!;
         private Button btnLoadVideos = null!;
         private Button btnConvertAll = null!;
-        private Button btnYouTubeSettings = null!;
+        private Button btnShowLog = null!;
 
         // Split container for resizable layout
         private SplitContainer splitMain = null!;        // Vertical: Videos | Preview
@@ -57,7 +59,6 @@ namespace VideoConverterApp
         private ProgressBar progressBar = null!;
         private Label lblProgress = null!;
         private Label lblCurrentTask = null!;
-        private Button btnShowLog = null!;
         private Panel pnlStatusBar = null!;
 
         // Log dialog and its RichTextBox
@@ -104,54 +105,78 @@ namespace VideoConverterApp
             this.Controls.Add(pnlTop);
 
             int y = 10;
+            int labelWidth = 90;
+            int textBoxWidth = 500;
+            int browseWidth = 30;
+            int settingsBtnWidth = 110;
 
-            // Input Folder
-            var lblInput = new Label { Text = "Input Folder:", Location = new Point(10, y + 3), Width = 90 };
+            // Row 1: Input Folder + ... + Settings button
+            var lblInput = new Label { Text = "Input Folder:", Location = new Point(10, y + 3), Width = labelWidth };
             txtInputFolder = new TextBox
             {
-                Location = new Point(105, y),
-                Width = 500,
+                Location = new Point(10 + labelWidth + 5, y),
+                Width = textBoxWidth,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             btnBrowseInput = new Button
             {
                 Text = "...",
-                Width = 30,
+                Width = browseWidth,
+                Height = 23,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
-            btnBrowseInput.Location = new Point(txtInputFolder.Right + 5, y - 2);
             btnBrowseInput.Click += BtnBrowseInput_Click;
-            pnlTop.Controls.AddRange(new Control[] { lblInput, txtInputFolder, btnBrowseInput });
 
-            y += 30;
+            btnSettings = new Button
+            {
+                Text = "Settings...",
+                Width = settingsBtnWidth,
+                Height = 23,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnSettings.Click += BtnSettings_Click;
 
-            // Output Folder
-            var lblOutput = new Label { Text = "Output Folder:", Location = new Point(10, y + 3), Width = 90 };
+            pnlTop.Controls.AddRange(new Control[] { lblInput, txtInputFolder, btnBrowseInput, btnSettings });
+
+            y += 28;
+
+            // Row 2: Output Folder + ... + YouTube Settings button
+            var lblOutput = new Label { Text = "Output Folder:", Location = new Point(10, y + 3), Width = labelWidth };
             txtOutputFolder = new TextBox
             {
-                Location = new Point(105, y),
-                Width = 500,
+                Location = new Point(10 + labelWidth + 5, y),
+                Width = textBoxWidth,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             btnBrowseOutput = new Button
             {
                 Text = "...",
-                Width = 30,
+                Width = browseWidth,
+                Height = 23,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
-            btnBrowseOutput.Location = new Point(txtOutputFolder.Right + 5, y - 2);
             btnBrowseOutput.Click += BtnBrowseOutput_Click;
-            pnlTop.Controls.AddRange(new Control[] { lblOutput, txtOutputFolder, btnBrowseOutput });
 
-            y += 35;
+            btnYouTubeSettings = new Button
+            {
+                Text = "YouTube...",
+                Width = settingsBtnWidth,
+                Height = 23,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnYouTubeSettings.Click += BtnYouTubeSettings_Click;
 
-            // Buttons
+            pnlTop.Controls.AddRange(new Control[] { lblOutput, txtOutputFolder, btnBrowseOutput, btnYouTubeSettings });
+
+            y += 32;
+
+            // Row 3: Load Videos + Convert All (center-ish) | Show Log (right)
             btnLoadVideos = new Button
             {
                 Text = "Load Videos",
-                Location = new Point(10, y),
-                Width = 120,
-                Height = 30,
+                Location = new Point(10 + labelWidth + 5, y),
+                Width = 110,
+                Height = 28,
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
             };
             btnLoadVideos.Click += BtnLoadVideos_Click;
@@ -159,24 +184,55 @@ namespace VideoConverterApp
             btnConvertAll = new Button
             {
                 Text = "Convert All",
-                Location = new Point(140, y),
-                Width = 120,
-                Height = 30,
+                Location = new Point(10 + labelWidth + 5 + 115, y),
+                Width = 110,
+                Height = 28,
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
                 Enabled = false
             };
             btnConvertAll.Click += BtnConvertAll_Click;
 
-            btnYouTubeSettings = new Button
+            btnShowLog = new Button
             {
-                Text = "YouTube Settings...",
-                Location = new Point(270, y),
-                Width = 140,
-                Height = 30
+                Text = "Show Log...",
+                Width = settingsBtnWidth,
+                Height = 28,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
-            btnYouTubeSettings.Click += BtnYouTubeSettings_Click;
+            btnShowLog.Click += BtnShowLog_Click;
 
-            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnYouTubeSettings });
+            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnShowLog });
+
+            // Position anchored buttons after adding to panel
+            UpdateTopPanelButtonPositions();
+        }
+
+        private void UpdateTopPanelButtonPositions()
+        {
+            if (pnlTop == null) return;
+
+            int rightMargin = 10;
+            int settingsBtnWidth = 110;
+            int browseWidth = 30;
+            int gap = 5;
+
+            // Calculate right-aligned positions
+            int showLogRight = pnlTop.ClientSize.Width - rightMargin;
+            int youtubeRight = showLogRight;
+            int settingsRight = showLogRight;
+
+            // Row 1: Settings button and browse button positions
+            btnSettings.Location = new Point(settingsRight - settingsBtnWidth, 10);
+            btnBrowseInput.Location = new Point(btnSettings.Left - gap - browseWidth, 10);
+            txtInputFolder.Width = btnBrowseInput.Left - gap - txtInputFolder.Left;
+
+            // Row 2: YouTube button and browse button positions
+            btnYouTubeSettings.Location = new Point(youtubeRight - settingsBtnWidth, 38);
+            btnBrowseOutput.Location = new Point(btnYouTubeSettings.Left - gap - browseWidth, 38);
+            txtOutputFolder.Width = btnBrowseOutput.Left - gap - txtOutputFolder.Left;
+
+            // Row 3: Show Log button position
+            btnShowLog.Location = new Point(showLogRight - settingsBtnWidth, 70);
         }
 
         private void CreateMainLayout()
@@ -248,22 +304,24 @@ namespace VideoConverterApp
             previewLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F)); // Settings
             pnlPreview.Controls.Add(previewLayout);
 
-            // Left side: Thumbnail previews
+            // Left side: Thumbnail previews (scrollable)
             var pnlThumbnails = new Panel
             {
                 Dock = DockStyle.Fill,
-                AutoScroll = true
+                AutoScroll = true,
+                AutoScrollMinSize = new Size(300, 400)
             };
             previewLayout.Controls.Add(pnlThumbnails, 0, 0);
 
             CreateThumbnailSection(pnlThumbnails);
 
-            // Right side: Settings controls
+            // Right side: Settings controls (scrollable)
             var pnlSettings = new Panel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
-                Padding = new Padding(10, 0, 0, 0)
+                Padding = new Padding(10, 0, 0, 0),
+                AutoScrollMinSize = new Size(320, 350)
             };
             previewLayout.Controls.Add(pnlSettings, 1, 0);
 
@@ -272,11 +330,15 @@ namespace VideoConverterApp
 
         private void CreateThumbnailSection(Panel parent)
         {
+            // Set minimum size for scrolling to work
             var grpThumbnails = new GroupBox
             {
                 Text = "Preview Thumbnails",
                 Dock = DockStyle.Fill,
-                Padding = new Padding(10)
+                Padding = new Padding(10),
+                MinimumSize = new Size(300, 400),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink
             };
             parent.Controls.Add(grpThumbnails);
 
@@ -286,7 +348,10 @@ namespace VideoConverterApp
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 5,
-                Padding = new Padding(5)
+                Padding = new Padding(5),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                MinimumSize = new Size(280, 380)
             };
             thumbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             thumbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
@@ -545,7 +610,7 @@ namespace VideoConverterApp
             pnlStatusBar = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 60,
+                Height = 50,
                 BorderStyle = BorderStyle.FixedSingle,
                 Padding = new Padding(10, 5, 10, 5)
             };
@@ -560,45 +625,35 @@ namespace VideoConverterApp
             };
             pnlStatusBar.Controls.Add(progressBar);
 
-            // Panel for status text and button
+            // Panel for status text
             var pnlStatusContent = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(0, 5, 0, 0)
+                Padding = new Padding(0, 3, 0, 0)
             };
             pnlStatusBar.Controls.Add(pnlStatusContent);
 
-            // Status label (left side)
+            // Status label
             lblProgress = new Label
             {
                 Text = "Ready",
-                Location = new Point(0, 5),
+                Dock = DockStyle.Left,
                 AutoSize = true,
-                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
+                Padding = new Padding(0, 2, 0, 0)
             };
             pnlStatusContent.Controls.Add(lblProgress);
 
-            // Current task label
+            // Current task label (to the right of status)
             lblCurrentTask = new Label
             {
                 Text = "",
-                Location = new Point(0, 22),
-                AutoSize = true,
-                ForeColor = Color.DarkBlue
+                Dock = DockStyle.Fill,
+                AutoSize = false,
+                ForeColor = Color.DarkBlue,
+                Padding = new Padding(10, 2, 0, 0)
             };
             pnlStatusContent.Controls.Add(lblCurrentTask);
-
-            // Show Log button (right side)
-            btnShowLog = new Button
-            {
-                Text = "Show Log...",
-                Width = 90,
-                Height = 25,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            btnShowLog.Location = new Point(pnlStatusContent.Width - btnShowLog.Width - 5, 5);
-            btnShowLog.Click += BtnShowLog_Click;
-            pnlStatusContent.Controls.Add(btnShowLog);
 
             // Initialize the log dialog (hidden by default)
             InitializeLogDialog();
@@ -627,10 +682,25 @@ namespace VideoConverterApp
 
         private void MainForm_Resize(object? sender, EventArgs e)
         {
-            // Update the Show Log button position when resizing
-            if (btnShowLog != null && pnlStatusBar != null)
+            // Update top panel button positions when resizing
+            UpdateTopPanelButtonPositions();
+        }
+
+        private void BtnSettings_Click(object? sender, EventArgs e)
+        {
+            // Open Settings dialog
+            using var dlg = new SettingsDialog(settings);
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                btnShowLog.Location = new Point(pnlStatusBar.Width - btnShowLog.Width - 25, 5);
+                // Reload settings that might have changed
+                numCRF.Value = settings.CRF;
+                numBitrate.Value = settings.Bitrate;
+                chkMoveProcessed.Checked = settings.MoveProcessedFiles;
+
+                // Update trackbar defaults for new videos
+                trackBrightness.Value = (int)(settings.Brightness * 100);
+                trackContrast.Value = (int)(settings.Contrast * 100);
+                trackSaturation.Value = (int)(settings.Saturation * 100);
             }
         }
 
