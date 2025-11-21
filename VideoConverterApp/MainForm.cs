@@ -54,16 +54,6 @@ namespace VideoConverterApp
         private NumericUpDown numBitrate = null!;
         private CheckBox chkMoveProcessed = null!;
 
-        // YouTube controls (for dialog)
-        private CheckBox chkEnableYouTube = null!;
-        private TextBox txtYouTubeTitleTemplate = null!;
-        private TextBox txtYouTubeDescriptionTemplate = null!;
-        private TextBox txtYouTubeTags = null!;
-        private ComboBox cmbYouTubePrivacy = null!;
-        private ComboBox cmbYouTubeCategory = null!;
-        private Button btnYouTubeAuth = null!;
-        private Label lblYouTubeStatus = null!;
-
         // Progress and log
         private ProgressBar progressBar = null!;
         private Label lblProgress = null!;

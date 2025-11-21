@@ -30,10 +30,10 @@ namespace VideoConverterApp
                 return;
             }
 
-            if (chkEnableYouTube.Checked && youtubeUploader == null)
+            if (settings.EnableYouTubeUpload && youtubeUploader == null)
             {
                 MessageBox.Show(
-                    "YouTube upload is enabled but you haven't authenticated yet.\n\nPlease click 'Authenticate' first, or disable YouTube upload.",
+                    "YouTube upload is enabled but you haven't authenticated yet.\n\nPlease open YouTube Settings and click 'Authenticate' first, or disable YouTube upload.",
                     "YouTube Authentication Required",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -133,7 +133,7 @@ namespace VideoConverterApp
                     }
 
                     // Upload to YouTube if enabled
-                    if (chkEnableYouTube.Checked && youtubeUploader != null)
+                    if (settings.EnableYouTubeUpload && youtubeUploader != null)
                     {
                         lblProgress.Text = $"Uploading {i + 1}/{videos.Count} to YouTube: {fileName}";
                         LogInfo("  Uploading to YouTube...");
