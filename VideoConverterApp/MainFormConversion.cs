@@ -69,6 +69,7 @@ namespace VideoConverterApp
                 btnConvertAll.Enabled = true;
                 btnLoadVideos.Enabled = true;
                 lblProgress.Text = "Ready";
+                lblCurrentTask.Text = "";
             }
         }
 
@@ -103,7 +104,8 @@ namespace VideoConverterApp
                 string outputPath = Path.Combine(outputFolder, fileName);
                 string processedPath = Path.Combine(processedFolder, fileName);
 
-                lblProgress.Text = $"Converting {i + 1}/{videos.Count}: {fileName}";
+                lblProgress.Text = $"Converting {i + 1}/{videos.Count}";
+                lblCurrentTask.Text = fileName;
                 LogInfo($"[{i + 1}/{videos.Count}] Processing: {fileName}");
                 LogInfo($"  Settings: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
 
@@ -135,7 +137,8 @@ namespace VideoConverterApp
                     // Upload to YouTube if enabled
                     if (settings.EnableYouTubeUpload && youtubeUploader != null)
                     {
-                        lblProgress.Text = $"Uploading {i + 1}/{videos.Count} to YouTube: {fileName}";
+                        lblProgress.Text = $"Uploading {i + 1}/{videos.Count} to YouTube";
+                        lblCurrentTask.Text = fileName;
                         LogInfo("  Uploading to YouTube...");
 
                         string title = youtubeUploader.ProcessTemplate(settings.YouTubeTitleTemplate, outputPath);

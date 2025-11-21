@@ -58,6 +58,7 @@ namespace VideoConverterApp
 
             btnLoadVideos.Enabled = false;
             lblProgress.Text = "Loading videos...";
+            lblCurrentTask.Text = txtInputFolder.Text;
             lstVideos.Items.Clear();
 
             // Clear preview images from PictureBoxes to release references
@@ -99,6 +100,7 @@ namespace VideoConverterApp
                 }
 
                 lblProgress.Text = $"Loaded {videoItems.Count} video(s)";
+                lblCurrentTask.Text = "";
                 LogInfo($"Loaded {videoItems.Count} video(s) from {txtInputFolder.Text}");
 
                 if (videoItems.Count > 0)
@@ -149,6 +151,7 @@ namespace VideoConverterApp
             if (currentVideo == null) return;
 
             lblProgress.Text = "Loading previews...";
+            lblCurrentTask.Text = currentVideo?.FileName ?? "";
             btnRefreshPreview.Enabled = false;
 
             try
@@ -169,6 +172,7 @@ namespace VideoConverterApp
                 await RegenerateFilteredPreviewsAsync();
 
                 lblProgress.Text = "Ready";
+                lblCurrentTask.Text = "";
             }
             catch (Exception ex)
             {

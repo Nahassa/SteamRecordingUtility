@@ -21,9 +21,8 @@ namespace VideoConverterApp
         private Button btnConvertAll = null!;
         private Button btnYouTubeSettings = null!;
 
-        // Split containers for resizable layout
-        private SplitContainer splitMain = null!;        // Vertical: Videos | (Preview+Log)
-        private SplitContainer splitRight = null!;       // Horizontal: Preview | Log
+        // Split container for resizable layout
+        private SplitContainer splitMain = null!;        // Vertical: Videos | Preview
 
         // Left panel - Video list
         private ListBox lstVideos = null!;
@@ -54,9 +53,15 @@ namespace VideoConverterApp
         private NumericUpDown numBitrate = null!;
         private CheckBox chkMoveProcessed = null!;
 
-        // Progress and log
+        // Progress and status bar (log moved to separate dialog)
         private ProgressBar progressBar = null!;
         private Label lblProgress = null!;
+        private Label lblCurrentTask = null!;
+        private Button btnShowLog = null!;
+        private Panel pnlStatusBar = null!;
+
+        // Log dialog and its RichTextBox
+        private LogDialog? logDialog = null;
         private RichTextBox txtLog = null!;
 
         public MainForm()
@@ -74,16 +79,18 @@ namespace VideoConverterApp
         private void InitializeComponent()
         {
             this.Text = "Steam Recording Video Converter";
-            this.Size = new Size(1400, 1000);
-            this.MinimumSize = new Size(1000, 700);
+            this.Size = new Size(1280, 720);
+            // Minimum 16:9 aspect ratio at 1280x720
+            this.MinimumSize = new Size(1280, 720);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormClosing += MainForm_FormClosing;
+            this.Resize += MainForm_Resize;
 
-            // Create top panel (docked, fixed height)
-            CreateTopPanel();
-
-            // Create main split container layout (resizable)
+            // Create main split container layout FIRST (will dock Fill)
             CreateMainLayout();
+
+            // Create top panel LAST (will dock Top - takes priority in z-order)
+            CreateTopPanel();
         }
 
         private void CreateTopPanel()
@@ -174,12 +181,16 @@ namespace VideoConverterApp
 
         private void CreateMainLayout()
         {
-            // Main horizontal split: Videos (left) | Preview+Log (right)
+            // Create status bar at bottom first (will dock Bottom)
+            CreateStatusBar();
+
+            // Main horizontal split: Videos (left) | Preview (right)
             splitMain = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                SplitterDistance = 300,
+                SplitterDistance = 250,
+                SplitterWidth = 6,
                 BorderStyle = BorderStyle.Fixed3D,
                 FixedPanel = FixedPanel.Panel1  // Keep video list fixed width when resizing
             };
@@ -188,21 +199,8 @@ namespace VideoConverterApp
             // Left panel: Video list
             CreateVideoListPanel();
 
-            // Right side: Vertical split (Preview | Log)
-            splitRight = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                SplitterDistance = 550,
-                BorderStyle = BorderStyle.None
-            };
-            splitMain.Panel2.Controls.Add(splitRight);
-
-            // Top of right: Preview and settings
+            // Right side: Preview and settings (no log - moved to dialog)
             CreatePreviewPanel();
-
-            // Bottom of right: Progress and log (resizable!)
-            CreateLogPanel();
         }
 
         private void CreateVideoListPanel()
@@ -236,118 +234,167 @@ namespace VideoConverterApp
                 AutoScroll = true,
                 Padding = new Padding(5)
             };
-            splitRight.Panel1.Controls.Add(pnlPreview);
+            splitMain.Panel2.Controls.Add(pnlPreview);
 
-            var grpPreview = new GroupBox
+            // Create a TableLayoutPanel for responsive layout
+            var previewLayout = new TableLayoutPanel
             {
-                Text = "Preview & Settings",
-                Location = new Point(5, 5),
-                Width = 1040,
-                Height = 490,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(5)
             };
-            pnlPreview.Controls.Add(grpPreview);
+            previewLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F)); // Thumbnails
+            previewLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F)); // Settings
+            pnlPreview.Controls.Add(previewLayout);
 
-            // Preview images layout
-            int previewTop = 25;
-            int imgWidth = 220;
-            int imgHeight = 165;
+            // Left side: Thumbnail previews
+            var pnlThumbnails = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true
+            };
+            previewLayout.Controls.Add(pnlThumbnails, 0, 0);
 
-            // 40% through video
+            CreateThumbnailSection(pnlThumbnails);
+
+            // Right side: Settings controls
+            var pnlSettings = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                Padding = new Padding(10, 0, 0, 0)
+            };
+            previewLayout.Controls.Add(pnlSettings, 1, 0);
+
+            CreateSettingsSection(pnlSettings);
+        }
+
+        private void CreateThumbnailSection(Panel parent)
+        {
+            var grpThumbnails = new GroupBox
+            {
+                Text = "Preview Thumbnails",
+                Dock = DockStyle.Fill,
+                Padding = new Padding(10)
+            };
+            parent.Controls.Add(grpThumbnails);
+
+            // Use TableLayoutPanel for thumbnail grid
+            var thumbLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 5,
+                Padding = new Padding(5)
+            };
+            thumbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            thumbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 25F)); // Label row
+            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F)); // Before/After labels
+            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F)); // Images
+            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F)); // Before/After labels
+            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F)); // Images
+            grpThumbnails.Controls.Add(thumbLayout);
+
+            // 40% section header
             lbl40 = new Label
             {
                 Text = "40% through video",
-                Location = new Point(10, previewTop),
-                Width = 450,
-                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+                Dock = DockStyle.Fill,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft
             };
-            grpPreview.Controls.Add(lbl40);
+            thumbLayout.Controls.Add(lbl40, 0, 0);
+            thumbLayout.SetColumnSpan(lbl40, 2);
 
-            previewTop += 20;
+            // Before/After labels for 40%
+            var lbl40Before = new Label { Text = "Before", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft };
+            var lbl40After = new Label { Text = "After", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft };
+            thumbLayout.Controls.Add(lbl40Before, 0, 1);
+            thumbLayout.Controls.Add(lbl40After, 1, 1);
 
-            var lbl40Before = new Label { Text = "Before", Location = new Point(10, previewTop), Width = imgWidth };
-            var lbl40After = new Label { Text = "After", Location = new Point(10 + imgWidth + 10, previewTop), Width = imgWidth };
-            grpPreview.Controls.AddRange(new Control[] { lbl40Before, lbl40After });
-
-            previewTop += 20;
-
+            // 40% thumbnails
             pic40Before = new PictureBox
             {
-                Location = new Point(10, previewTop),
-                Size = new Size(imgWidth, imgHeight),
+                Dock = DockStyle.Fill,
                 BorderStyle = BorderStyle.FixedSingle,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.Black
             };
-
             pic40After = new PictureBox
             {
-                Location = new Point(10 + imgWidth + 10, previewTop),
-                Size = new Size(imgWidth, imgHeight),
+                Dock = DockStyle.Fill,
                 BorderStyle = BorderStyle.FixedSingle,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.Black
             };
+            thumbLayout.Controls.Add(pic40Before, 0, 2);
+            thumbLayout.Controls.Add(pic40After, 1, 2);
 
-            grpPreview.Controls.AddRange(new Control[] { pic40Before, pic40After });
+            // Before/After labels for 60%
+            var lbl60Before = new Label { Text = "Before", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft };
+            var lbl60After = new Label { Text = "After", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft };
+            thumbLayout.Controls.Add(lbl60Before, 0, 3);
+            thumbLayout.Controls.Add(lbl60After, 1, 3);
 
-            // 60% through video
-            previewTop += imgHeight + 15;
-
+            // 60% section header (placed as tooltip/combined with label)
             lbl60 = new Label
             {
                 Text = "60% through video",
-                Location = new Point(10, previewTop),
-                Width = 450,
-                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+                Dock = DockStyle.Fill,
+                Font = new Font(this.Font.FontFamily, 8, FontStyle.Italic),
+                TextAlign = ContentAlignment.BottomRight,
+                ForeColor = Color.Gray
             };
-            grpPreview.Controls.Add(lbl60);
+            // We'll place this differently - combine with the label row
 
-            previewTop += 20;
-
-            var lbl60Before = new Label { Text = "Before", Location = new Point(10, previewTop), Width = imgWidth };
-            var lbl60After = new Label { Text = "After", Location = new Point(10 + imgWidth + 10, previewTop), Width = imgWidth };
-            grpPreview.Controls.AddRange(new Control[] { lbl60Before, lbl60After });
-
-            previewTop += 20;
-
+            // 60% thumbnails
             pic60Before = new PictureBox
             {
-                Location = new Point(10, previewTop),
-                Size = new Size(imgWidth, imgHeight),
+                Dock = DockStyle.Fill,
                 BorderStyle = BorderStyle.FixedSingle,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.Black
             };
-
             pic60After = new PictureBox
             {
-                Location = new Point(10 + imgWidth + 10, previewTop),
-                Size = new Size(imgWidth, imgHeight),
+                Dock = DockStyle.Fill,
                 BorderStyle = BorderStyle.FixedSingle,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.Black
             };
-
-            grpPreview.Controls.AddRange(new Control[] { pic60Before, pic60After });
-
-            // Controls on the right side
-            int controlsLeft = 470;
-            int controlsTop = 25;
-            CreateAdjustmentControls(grpPreview, controlsLeft, controlsTop);
+            thumbLayout.Controls.Add(pic60Before, 0, 4);
+            thumbLayout.Controls.Add(pic60After, 1, 4);
         }
 
-        private void CreateAdjustmentControls(GroupBox parent, int left, int top)
+        private void CreateSettingsSection(Panel parent)
         {
-            int y = top;
+            var grpSettings = new GroupBox
+            {
+                Text = "Adjustment Settings",
+                Dock = DockStyle.Fill,
+                Padding = new Padding(10)
+            };
+            parent.Controls.Add(grpSettings);
+
+            var settingsContainer = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true
+            };
+            grpSettings.Controls.Add(settingsContainer);
+
+            int y = 10;
             int labelWidth = 80;
-            int trackWidth = 200;
+            int trackWidth = 180;
+            int valueWidth = 50;
 
             // Brightness
-            var lblBrightness = new Label { Text = "Brightness:", Location = new Point(left, y + 3), Width = labelWidth };
+            var lblBrightness = new Label { Text = "Brightness:", Location = new Point(10, y + 3), Width = labelWidth };
             trackBrightness = new TrackBar
             {
-                Location = new Point(left + labelWidth, y),
+                Location = new Point(10 + labelWidth, y),
                 Width = trackWidth,
                 Minimum = -100,
                 Maximum = 100,
@@ -358,19 +405,19 @@ namespace VideoConverterApp
 
             lblBrightnessValue = new Label
             {
-                Location = new Point(left + labelWidth + trackWidth + 5, y + 3),
-                Width = 50,
+                Location = new Point(10 + labelWidth + trackWidth + 5, y + 3),
+                Width = valueWidth,
                 Text = "0.00"
             };
 
-            parent.Controls.AddRange(new Control[] { lblBrightness, trackBrightness, lblBrightnessValue });
+            settingsContainer.Controls.AddRange(new Control[] { lblBrightness, trackBrightness, lblBrightnessValue });
             y += 50;
 
             // Contrast
-            var lblContrast = new Label { Text = "Contrast:", Location = new Point(left, y + 3), Width = labelWidth };
+            var lblContrast = new Label { Text = "Contrast:", Location = new Point(10, y + 3), Width = labelWidth };
             trackContrast = new TrackBar
             {
-                Location = new Point(left + labelWidth, y),
+                Location = new Point(10 + labelWidth, y),
                 Width = trackWidth,
                 Minimum = 0,
                 Maximum = 400,
@@ -381,19 +428,19 @@ namespace VideoConverterApp
 
             lblContrastValue = new Label
             {
-                Location = new Point(left + labelWidth + trackWidth + 5, y + 3),
-                Width = 50,
+                Location = new Point(10 + labelWidth + trackWidth + 5, y + 3),
+                Width = valueWidth,
                 Text = "1.00"
             };
 
-            parent.Controls.AddRange(new Control[] { lblContrast, trackContrast, lblContrastValue });
+            settingsContainer.Controls.AddRange(new Control[] { lblContrast, trackContrast, lblContrastValue });
             y += 50;
 
             // Saturation
-            var lblSaturation = new Label { Text = "Saturation:", Location = new Point(left, y + 3), Width = labelWidth };
+            var lblSaturation = new Label { Text = "Saturation:", Location = new Point(10, y + 3), Width = labelWidth };
             trackSaturation = new TrackBar
             {
-                Location = new Point(left + labelWidth, y),
+                Location = new Point(10 + labelWidth, y),
                 Width = trackWidth,
                 Minimum = 0,
                 Maximum = 300,
@@ -404,20 +451,20 @@ namespace VideoConverterApp
 
             lblSaturationValue = new Label
             {
-                Location = new Point(left + labelWidth + trackWidth + 5, y + 3),
-                Width = 50,
+                Location = new Point(10 + labelWidth + trackWidth + 5, y + 3),
+                Width = valueWidth,
                 Text = "1.20"
             };
 
-            parent.Controls.AddRange(new Control[] { lblSaturation, trackSaturation, lblSaturationValue });
+            settingsContainer.Controls.AddRange(new Control[] { lblSaturation, trackSaturation, lblSaturationValue });
             y += 50;
 
             // Buttons
             btnRefreshPreview = new Button
             {
                 Text = "Refresh Preview",
-                Location = new Point(left, y),
-                Width = 120,
+                Location = new Point(10, y),
+                Width = 110,
                 Height = 25
             };
             btnRefreshPreview.Click += BtnRefreshPreview_Click;
@@ -425,8 +472,8 @@ namespace VideoConverterApp
             btnApplyToAll = new Button
             {
                 Text = "Apply to All",
-                Location = new Point(left + 130, y),
-                Width = 100,
+                Location = new Point(125, y),
+                Width = 90,
                 Height = 25
             };
             btnApplyToAll.Click += BtnApplyToAll_Click;
@@ -434,109 +481,157 @@ namespace VideoConverterApp
             btnReset = new Button
             {
                 Text = "Reset",
-                Location = new Point(left + 240, y),
-                Width = 80,
+                Location = new Point(220, y),
+                Width = 70,
                 Height = 25
             };
             btnReset.Click += BtnReset_Click;
 
-            parent.Controls.AddRange(new Control[] { btnRefreshPreview, btnApplyToAll, btnReset });
+            settingsContainer.Controls.AddRange(new Control[] { btnRefreshPreview, btnApplyToAll, btnReset });
             y += 35;
 
             // Resolution and quality settings
-            var lblResolution = new Label { Text = "Resolution:", Location = new Point(left, y + 3), Width = labelWidth };
+            var lblResolution = new Label { Text = "Resolution:", Location = new Point(10, y + 3), Width = labelWidth };
             cmbResolution = new ComboBox
             {
-                Location = new Point(left + labelWidth, y),
+                Location = new Point(10 + labelWidth, y),
                 Width = 150,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbResolution.Items.AddRange(new[] { "1920x1080 (Full HD)", "2560x1440 (2K)", "3840x2160 (4K)", "Custom" });
             cmbResolution.SelectedIndex = 0;
 
-            parent.Controls.AddRange(new Control[] { lblResolution, cmbResolution });
+            settingsContainer.Controls.AddRange(new Control[] { lblResolution, cmbResolution });
             y += 35;
 
-            var lblCRF = new Label { Text = "CRF:", Location = new Point(left, y + 3), Width = labelWidth };
+            var lblCRF = new Label { Text = "CRF:", Location = new Point(10, y + 3), Width = labelWidth };
             numCRF = new NumericUpDown
             {
-                Location = new Point(left + labelWidth, y),
+                Location = new Point(10 + labelWidth, y),
                 Width = 60,
                 Minimum = 0,
                 Maximum = 51,
                 Value = 18
             };
 
-            var lblBitrate = new Label { Text = "Bitrate (kbps):", Location = new Point(left + 160, y + 3), Width = 90 };
+            var lblBitrate = new Label { Text = "Bitrate:", Location = new Point(160, y + 3), Width = 50 };
             numBitrate = new NumericUpDown
             {
-                Location = new Point(left + 250, y),
-                Width = 80,
+                Location = new Point(215, y),
+                Width = 75,
                 Minimum = 1000,
                 Maximum = 100000,
                 Value = 20000,
                 Increment = 1000
             };
+            var lblKbps = new Label { Text = "kbps", Location = new Point(292, y + 3), Width = 35 };
 
-            parent.Controls.AddRange(new Control[] { lblCRF, numCRF, lblBitrate, numBitrate });
+            settingsContainer.Controls.AddRange(new Control[] { lblCRF, numCRF, lblBitrate, numBitrate, lblKbps });
             y += 35;
 
             chkMoveProcessed = new CheckBox
             {
                 Text = "Move original files to processed folder",
-                Location = new Point(left, y),
-                Width = 300,
+                Location = new Point(10, y),
+                Width = 280,
                 Checked = true
             };
 
-            parent.Controls.Add(chkMoveProcessed);
+            settingsContainer.Controls.Add(chkMoveProcessed);
         }
 
-        private void CreateLogPanel()
+        private void CreateStatusBar()
         {
-            var pnlLog = new Panel
+            pnlStatusBar = new Panel
             {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(5)
+                Dock = DockStyle.Bottom,
+                Height = 60,
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(10, 5, 10, 5)
             };
-            splitRight.Panel2.Controls.Add(pnlLog);
+            this.Controls.Add(pnlStatusBar);
 
-            var lblLog = new Label
-            {
-                Text = "Log (Drag divider above to resize)",
-                Dock = DockStyle.Top,
-                Height = 20,
-                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
-                ForeColor = Color.DarkBlue
-            };
-            pnlLog.Controls.Add(lblLog);
-
-            lblProgress = new Label
-            {
-                Dock = DockStyle.Top,
-                Height = 20,
-                Text = "Ready",
-                Padding = new Padding(0, 2, 0, 0)
-            };
-            pnlLog.Controls.Add(lblProgress);
-
+            // Progress bar at top of status bar
             progressBar = new ProgressBar
             {
                 Dock = DockStyle.Top,
-                Height = 20,
+                Height = 18,
                 Style = ProgressBarStyle.Continuous
             };
-            pnlLog.Controls.Add(progressBar);
+            pnlStatusBar.Controls.Add(progressBar);
 
-            txtLog = new RichTextBox
+            // Panel for status text and button
+            var pnlStatusContent = new Panel
             {
                 Dock = DockStyle.Fill,
-                ReadOnly = true,
-                Font = new Font("Consolas", 9),
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
+                Padding = new Padding(0, 5, 0, 0)
             };
-            pnlLog.Controls.Add(txtLog);
+            pnlStatusBar.Controls.Add(pnlStatusContent);
+
+            // Status label (left side)
+            lblProgress = new Label
+            {
+                Text = "Ready",
+                Location = new Point(0, 5),
+                AutoSize = true,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+            };
+            pnlStatusContent.Controls.Add(lblProgress);
+
+            // Current task label
+            lblCurrentTask = new Label
+            {
+                Text = "",
+                Location = new Point(0, 22),
+                AutoSize = true,
+                ForeColor = Color.DarkBlue
+            };
+            pnlStatusContent.Controls.Add(lblCurrentTask);
+
+            // Show Log button (right side)
+            btnShowLog = new Button
+            {
+                Text = "Show Log...",
+                Width = 90,
+                Height = 25,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnShowLog.Location = new Point(pnlStatusContent.Width - btnShowLog.Width - 5, 5);
+            btnShowLog.Click += BtnShowLog_Click;
+            pnlStatusContent.Controls.Add(btnShowLog);
+
+            // Initialize the log dialog (hidden by default)
+            InitializeLogDialog();
+        }
+
+        private void InitializeLogDialog()
+        {
+            logDialog = new LogDialog();
+            txtLog = logDialog.LogTextBox;
+        }
+
+        private void BtnShowLog_Click(object? sender, EventArgs e)
+        {
+            if (logDialog != null)
+            {
+                if (logDialog.Visible)
+                {
+                    logDialog.Focus();
+                }
+                else
+                {
+                    logDialog.Show(this);
+                }
+            }
+        }
+
+        private void MainForm_Resize(object? sender, EventArgs e)
+        {
+            // Update the Show Log button position when resizing
+            if (btnShowLog != null && pnlStatusBar != null)
+            {
+                btnShowLog.Location = new Point(pnlStatusBar.Width - btnShowLog.Width - 25, 5);
+            }
         }
 
         private void BtnYouTubeSettings_Click(object? sender, EventArgs e)
