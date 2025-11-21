@@ -160,8 +160,26 @@ namespace VideoConverterApp
                     }
                 };
 
+                // Try to extract recording date from filename and set it in RecordingDetails
+                string fileName = Path.GetFileNameWithoutExtension(filePath);
+                string recordingDateStr = ExtractRecordingDate(fileName);
+                string parts = "snippet,status";
+
+                if (!string.IsNullOrEmpty(recordingDateStr) &&
+                    DateTime.TryParseExact(recordingDateStr, "yyyy-MM-dd",
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None,
+                        out DateTime recordingDate))
+                {
+                    video.RecordingDetails = new VideoRecordingDetails
+                    {
+                        RecordingDate = recordingDate
+                    };
+                    parts = "snippet,status,recordingDetails";
+                }
+
                 using var fileStream = new FileStream(filePath, FileMode.Open);
-                var videosInsertRequest = youtubeService.Videos.Insert(video, "snippet,status", fileStream, "video/*");
+                var videosInsertRequest = youtubeService.Videos.Insert(video, parts, fileStream, "video/*");
 
                 videosInsertRequest.ProgressChanged += (uploadProgress) =>
                 {
