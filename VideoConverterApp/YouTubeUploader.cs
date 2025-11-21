@@ -173,7 +173,7 @@ namespace VideoConverterApp
                 {
                     video.RecordingDetails = new VideoRecordingDetails
                     {
-                        RecordingDate = recordingDate
+                        RecordingDateDateTimeOffset = new DateTimeOffset(recordingDate)
                     };
                     parts = "snippet,status,recordingDetails";
                 }
