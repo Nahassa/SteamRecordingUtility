@@ -151,7 +151,7 @@ namespace VideoConverterApp
             if (currentVideo == null) return;
 
             lblProgress.Text = "Loading previews...";
-            lblCurrentTask.Text = currentVideo?.FileName ?? "";
+            lblCurrentTask.Text = currentVideo.FileName;
             btnRefreshPreview.Enabled = false;
 
             try

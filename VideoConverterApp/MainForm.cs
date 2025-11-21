@@ -75,14 +75,28 @@ namespace VideoConverterApp
             previewRefreshTimer = new System.Windows.Forms.Timer();
             previewRefreshTimer.Interval = 800; // 800ms delay after last slider change
             previewRefreshTimer.Tick += PreviewRefreshTimer_Tick;
+
+            // Try to restore YouTube authentication in the background
+            TryRestoreYouTubeAuthAsync();
+        }
+
+        private async void TryRestoreYouTubeAuthAsync()
+        {
+            if (settings.EnableYouTubeUpload)
+            {
+                var uploader = new YouTubeUploader();
+                if (await uploader.TryRestoreAuthenticationAsync())
+                {
+                    youtubeUploader = uploader;
+                }
+            }
         }
 
         private void InitializeComponent()
         {
             this.Text = "Steam Recording Video Converter";
-            this.Size = new Size(1280, 720);
-            // Minimum 16:9 aspect ratio at 1280x720
-            this.MinimumSize = new Size(1280, 720);
+            this.Size = new Size(1200, 700);
+            // No minimum size - allow any window size
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormClosing += MainForm_FormClosing;
             this.Resize += MainForm_Resize;
@@ -304,12 +318,11 @@ namespace VideoConverterApp
             previewLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F)); // Settings
             pnlPreview.Controls.Add(previewLayout);
 
-            // Left side: Thumbnail previews (scrollable)
+            // Left side: Thumbnail previews (scrollable with fixed-size content)
             var pnlThumbnails = new Panel
             {
                 Dock = DockStyle.Fill,
-                AutoScroll = true,
-                AutoScrollMinSize = new Size(300, 400)
+                AutoScroll = true
             };
             previewLayout.Controls.Add(pnlThumbnails, 0, 0);
 
@@ -320,8 +333,7 @@ namespace VideoConverterApp
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
-                Padding = new Padding(10, 0, 0, 0),
-                AutoScrollMinSize = new Size(320, 350)
+                Padding = new Padding(10, 0, 0, 0)
             };
             previewLayout.Controls.Add(pnlSettings, 1, 0);
 
@@ -330,107 +342,100 @@ namespace VideoConverterApp
 
         private void CreateThumbnailSection(Panel parent)
         {
-            // Set minimum size for scrolling to work
-            var grpThumbnails = new GroupBox
+            // Fixed-size container for thumbnails (enables scrolling)
+            var thumbContainer = new Panel
             {
-                Text = "Preview Thumbnails",
-                Dock = DockStyle.Fill,
-                Padding = new Padding(10),
-                MinimumSize = new Size(300, 400),
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink
+                Location = new Point(0, 0),
+                Size = new Size(460, 520),
+                Padding = new Padding(5)
             };
-            parent.Controls.Add(grpThumbnails);
+            parent.Controls.Add(thumbContainer);
 
-            // Use TableLayoutPanel for thumbnail grid
-            var thumbLayout = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 2,
-                RowCount = 5,
-                Padding = new Padding(5),
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                MinimumSize = new Size(280, 380)
-            };
-            thumbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            thumbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 25F)); // Label row
-            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F)); // Before/After labels
-            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F)); // Images
-            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F)); // Before/After labels
-            thumbLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F)); // Images
-            grpThumbnails.Controls.Add(thumbLayout);
+            int y = 5;
+            int imgWidth = 200;
+            int imgHeight = 150;
+            int gap = 10;
 
             // 40% section header
             lbl40 = new Label
             {
                 Text = "40% through video",
-                Dock = DockStyle.Fill,
-                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleLeft
+                Location = new Point(5, y),
+                Size = new Size(450, 20),
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
             };
-            thumbLayout.Controls.Add(lbl40, 0, 0);
-            thumbLayout.SetColumnSpan(lbl40, 2);
+            thumbContainer.Controls.Add(lbl40);
+            y += 22;
 
             // Before/After labels for 40%
-            var lbl40Before = new Label { Text = "Before", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft };
-            var lbl40After = new Label { Text = "After", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft };
-            thumbLayout.Controls.Add(lbl40Before, 0, 1);
-            thumbLayout.Controls.Add(lbl40After, 1, 1);
+            var lbl40Before = new Label { Text = "Before", Location = new Point(5, y), Size = new Size(imgWidth, 18) };
+            var lbl40After = new Label { Text = "After", Location = new Point(5 + imgWidth + gap, y), Size = new Size(imgWidth, 18) };
+            thumbContainer.Controls.Add(lbl40Before);
+            thumbContainer.Controls.Add(lbl40After);
+            y += 20;
 
-            // 40% thumbnails
+            // 40% thumbnails (fixed size)
             pic40Before = new PictureBox
             {
-                Dock = DockStyle.Fill,
+                Location = new Point(5, y),
+                Size = new Size(imgWidth, imgHeight),
                 BorderStyle = BorderStyle.FixedSingle,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.Black
             };
             pic40After = new PictureBox
             {
-                Dock = DockStyle.Fill,
+                Location = new Point(5 + imgWidth + gap, y),
+                Size = new Size(imgWidth, imgHeight),
                 BorderStyle = BorderStyle.FixedSingle,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.Black
             };
-            thumbLayout.Controls.Add(pic40Before, 0, 2);
-            thumbLayout.Controls.Add(pic40After, 1, 2);
+            thumbContainer.Controls.Add(pic40Before);
+            thumbContainer.Controls.Add(pic40After);
+            y += imgHeight + 15;
 
-            // Before/After labels for 60%
-            var lbl60Before = new Label { Text = "Before", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft };
-            var lbl60After = new Label { Text = "After", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft };
-            thumbLayout.Controls.Add(lbl60Before, 0, 3);
-            thumbLayout.Controls.Add(lbl60After, 1, 3);
-
-            // 60% section header (placed as tooltip/combined with label)
+            // 60% section header
             lbl60 = new Label
             {
                 Text = "60% through video",
-                Dock = DockStyle.Fill,
-                Font = new Font(this.Font.FontFamily, 8, FontStyle.Italic),
-                TextAlign = ContentAlignment.BottomRight,
-                ForeColor = Color.Gray
+                Location = new Point(5, y),
+                Size = new Size(450, 20),
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
             };
-            // We'll place this differently - combine with the label row
+            thumbContainer.Controls.Add(lbl60);
+            y += 22;
 
-            // 60% thumbnails
+            // Before/After labels for 60%
+            var lbl60Before = new Label { Text = "Before", Location = new Point(5, y), Size = new Size(imgWidth, 18) };
+            var lbl60After = new Label { Text = "After", Location = new Point(5 + imgWidth + gap, y), Size = new Size(imgWidth, 18) };
+            thumbContainer.Controls.Add(lbl60Before);
+            thumbContainer.Controls.Add(lbl60After);
+            y += 20;
+
+            // 60% thumbnails (fixed size)
             pic60Before = new PictureBox
             {
-                Dock = DockStyle.Fill,
+                Location = new Point(5, y),
+                Size = new Size(imgWidth, imgHeight),
                 BorderStyle = BorderStyle.FixedSingle,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.Black
             };
             pic60After = new PictureBox
             {
-                Dock = DockStyle.Fill,
+                Location = new Point(5 + imgWidth + gap, y),
+                Size = new Size(imgWidth, imgHeight),
                 BorderStyle = BorderStyle.FixedSingle,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.Black
             };
-            thumbLayout.Controls.Add(pic60Before, 0, 4);
-            thumbLayout.Controls.Add(pic60After, 1, 4);
+            thumbContainer.Controls.Add(pic60Before);
+            thumbContainer.Controls.Add(pic60After);
+            y += imgHeight + 10;
+
+            // Set container size to fit content (enables scrolling when parent is smaller)
+            thumbContainer.Size = new Size(5 + imgWidth * 2 + gap + 15, y);
         }
 
         private void CreateSettingsSection(Panel parent)

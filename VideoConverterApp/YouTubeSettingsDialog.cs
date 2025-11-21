@@ -25,6 +25,23 @@ namespace VideoConverterApp
             this.YouTubeUploader = uploader;
             InitializeComponent();
             LoadSettings();
+
+            // Try to restore authentication if we don't have an uploader yet
+            if (this.YouTubeUploader == null)
+            {
+                TryRestoreAuthAsync();
+            }
+        }
+
+        private async void TryRestoreAuthAsync()
+        {
+            var uploader = new YouTubeUploader();
+            if (await uploader.TryRestoreAuthenticationAsync())
+            {
+                YouTubeUploader = uploader;
+                lblStatus.Text = "Authenticated (restored)";
+                lblStatus.ForeColor = Color.Green;
+            }
         }
 
         private void InitializeComponent()

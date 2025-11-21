@@ -14,6 +14,64 @@ namespace VideoConverterApp
         private YouTubeService? youtubeService;
         private static readonly string[] Scopes = { YouTubeService.Scope.YoutubeUpload };
 
+        /// <summary>
+        /// Try to restore authentication from saved token (silent, no UI prompts)
+        /// </summary>
+        public async Task<bool> TryRestoreAuthenticationAsync()
+        {
+            try
+            {
+                string credPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, CredentialsFileName);
+                string tokenPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, TokenFileName);
+
+                // Check if credentials file exists
+                if (!File.Exists(credPath))
+                    return false;
+
+                // Check if token directory exists with saved tokens
+                if (!Directory.Exists(tokenPath))
+                    return false;
+
+                var tokenFiles = Directory.GetFiles(tokenPath, "Google.Apis.Auth.OAuth2.Responses.TokenResponse-*");
+                if (tokenFiles.Length == 0)
+                    return false;
+
+                // Try to load saved credentials silently
+                UserCredential credential;
+                using (var stream = new FileStream(credPath, FileMode.Open, FileAccess.Read))
+                {
+                    credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                        GoogleClientSecrets.FromStream(stream).Secrets,
+                        Scopes,
+                        "user",
+                        CancellationToken.None,
+                        new Google.Apis.Util.Store.FileDataStore(tokenPath, true));
+                }
+
+                // Check if token is valid (not expired or can be refreshed)
+                if (credential.Token.IsStale)
+                {
+                    // Try to refresh the token
+                    bool refreshed = await credential.RefreshTokenAsync(CancellationToken.None);
+                    if (!refreshed)
+                        return false;
+                }
+
+                youtubeService = new YouTubeService(new BaseClientService.Initializer()
+                {
+                    HttpClientInitializer = credential,
+                    ApplicationName = "Steam Recording Video Converter"
+                });
+
+                return true;
+            }
+            catch
+            {
+                // Silent failure - user will need to authenticate manually
+                return false;
+            }
+        }
+
         public async Task<bool> AuthenticateAsync()
         {
             try
@@ -68,6 +126,8 @@ namespace VideoConverterApp
                 return false;
             }
         }
+
+        public bool IsAuthenticated => youtubeService != null;
 
         public async Task<(bool success, string? videoId, string? videoUrl)> UploadVideoAsync(
             string filePath,
