@@ -80,7 +80,8 @@ namespace VideoConverterApp
                 Font = new Font("Consolas", 9),
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
-                WordWrap = false
+                WordWrap = true,
+                ScrollBars = RichTextBoxScrollBars.Vertical
             };
             this.Controls.Add(txtLog);
 

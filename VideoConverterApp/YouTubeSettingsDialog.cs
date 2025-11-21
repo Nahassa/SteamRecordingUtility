@@ -84,7 +84,7 @@ namespace VideoConverterApp
 
             var lblTitleHelp = new Label
             {
-                Text = "Use {filename} for video filename, {date} for current date",
+                Text = "Use {filename}, {recording_date} (from filename), {date} (current date)",
                 Location = new Point(145, y),
                 Width = controlWidth,
                 ForeColor = Color.Gray,

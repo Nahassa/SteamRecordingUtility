@@ -96,7 +96,9 @@ namespace VideoConverterApp
         {
             this.Text = "Steam Recording Video Converter";
             this.Size = new Size(1200, 700);
-            // No minimum size - allow any window size
+            // Minimum width to prevent horizontal scrollbars (based on content widths)
+            // Video list (250) + Thumbnails (460) + Settings (350) + margins (60) = 1120
+            this.MinimumSize = new Size(1120, 0);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormClosing += MainForm_FormClosing;
             this.Resize += MainForm_Resize;
@@ -615,7 +617,7 @@ namespace VideoConverterApp
             pnlStatusBar = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 50,
+                Height = 55,
                 BorderStyle = BorderStyle.FixedSingle,
                 Padding = new Padding(10, 5, 10, 5)
             };
@@ -630,11 +632,18 @@ namespace VideoConverterApp
             };
             pnlStatusBar.Controls.Add(progressBar);
 
-            // Panel for status text
+            // Spacer panel between progress bar and text
+            var pnlSpacer = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 8
+            };
+            pnlStatusBar.Controls.Add(pnlSpacer);
+
+            // Panel for status text (add AFTER spacer so it appears below)
             var pnlStatusContent = new Panel
             {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(0, 3, 0, 0)
+                Dock = DockStyle.Fill
             };
             pnlStatusBar.Controls.Add(pnlStatusContent);
 
@@ -645,7 +654,7 @@ namespace VideoConverterApp
                 Dock = DockStyle.Left,
                 AutoSize = true,
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
-                Padding = new Padding(0, 2, 0, 0)
+                Padding = new Padding(0, 0, 0, 0)
             };
             pnlStatusContent.Controls.Add(lblProgress);
 
@@ -656,7 +665,7 @@ namespace VideoConverterApp
                 Dock = DockStyle.Fill,
                 AutoSize = false,
                 ForeColor = Color.DarkBlue,
-                Padding = new Padding(10, 2, 0, 0)
+                Padding = new Padding(10, 0, 0, 0)
             };
             pnlStatusContent.Controls.Add(lblCurrentTask);
 

@@ -210,15 +210,45 @@ namespace VideoConverterApp
             string fileNameWithExt = Path.GetFileName(filePath);
             DateTime now = DateTime.Now;
 
+            // Try to extract recording date from filename (yyyy-MM-dd format)
+            string recordingDate = ExtractRecordingDate(fileName);
+
             return template
                 .Replace("{filename}", fileName)
                 .Replace("{filename_ext}", fileNameWithExt)
+                .Replace("{recording_date}", recordingDate)
                 .Replace("{date}", now.ToString("yyyy-MM-dd"))
                 .Replace("{time}", now.ToString("HH:mm:ss"))
                 .Replace("{datetime}", now.ToString("yyyy-MM-dd HH:mm:ss"))
                 .Replace("{year}", now.Year.ToString())
                 .Replace("{month}", now.Month.ToString("D2"))
                 .Replace("{day}", now.Day.ToString("D2"));
+        }
+
+        /// <summary>
+        /// Extract recording date from filename in yyyy-MM-dd format
+        /// Returns empty string if no date found
+        /// </summary>
+        private static string ExtractRecordingDate(string fileName)
+        {
+            // Match yyyy-MM-dd pattern (e.g., 2024-01-15)
+            var match = System.Text.RegularExpressions.Regex.Match(
+                fileName,
+                @"(\d{4}-\d{2}-\d{2})");
+
+            if (match.Success)
+            {
+                // Validate it's actually a valid date
+                if (DateTime.TryParseExact(match.Groups[1].Value, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out _))
+                {
+                    return match.Groups[1].Value;
+                }
+            }
+
+            return string.Empty;
         }
     }
 }
