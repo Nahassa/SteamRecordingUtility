@@ -270,32 +270,42 @@ namespace VideoConverterApp
                         return false;
                     }
 
-                    // Read stderr line-by-line for real-time progress logging
+                    // Read stderr character by character to handle FFmpeg's \r-based progress updates
                     var errorLines = new List<string>();
-                    string? line;
-                    while ((line = process.StandardError.ReadLine()) != null)
+                    var lineBuilder = new System.Text.StringBuilder();
+                    string lastLoggedTime = "";
+                    int ch;
+
+                    while ((ch = process.StandardError.Read()) != -1)
                     {
-                        string trimmedLine = line.Trim();
+                        if (ch == '\r' || ch == '\n')
+                        {
+                            if (lineBuilder.Length > 0)
+                            {
+                                string trimmedLine = lineBuilder.ToString().Trim();
+                                lineBuilder.Clear();
+
+                                if (!string.IsNullOrWhiteSpace(trimmedLine))
+                                {
+                                    errorLines.Add(trimmedLine);
+                                    ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            lineBuilder.Append((char)ch);
+                        }
+                    }
+
+                    // Process any remaining content
+                    if (lineBuilder.Length > 0)
+                    {
+                        string trimmedLine = lineBuilder.ToString().Trim();
                         if (!string.IsNullOrWhiteSpace(trimmedLine))
                         {
                             errorLines.Add(trimmedLine);
-
-                            // Parse progress info (FFmpeg outputs lines like: frame=123 fps=30 ... time=00:01:23.45 ...)
-                            if (trimmedLine.Contains("time="))
-                            {
-                                string? timeInfo = ParseFFmpegTime(trimmedLine);
-                                if (timeInfo != null)
-                                {
-                                    Invoke(() => lblCurrentTask.Text = $"Encoding: {timeInfo}");
-                                }
-                            }
-                            // Log encoding info lines (skip verbose header info)
-                            else if (trimmedLine.StartsWith("frame=") ||
-                                     trimmedLine.Contains("Error") ||
-                                     trimmedLine.Contains("error"))
-                            {
-                                Invoke(() => LogInfo($"  {trimmedLine}"));
-                            }
+                            ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
                         }
                     }
 
@@ -322,6 +332,32 @@ namespace VideoConverterApp
                     return false;
                 }
             });
+        }
+
+        private void ProcessFFmpegLine(string trimmedLine, ref string lastLoggedTime)
+        {
+            // Parse progress info (FFmpeg outputs lines like: frame=123 fps=30 ... time=00:01:23.45 ...)
+            if (trimmedLine.Contains("time=") && trimmedLine.StartsWith("frame="))
+            {
+                string? timeInfo = ParseFFmpegTime(trimmedLine);
+                if (timeInfo != null)
+                {
+                    Invoke(() => lblCurrentTask.Text = $"Encoding: {timeInfo}");
+
+                    // Log progress every ~5 seconds of video time to avoid flooding
+                    string timePrefix = timeInfo.Length >= 7 ? timeInfo.Substring(0, 7) : timeInfo; // HH:MM:S
+                    if (timePrefix != lastLoggedTime)
+                    {
+                        lastLoggedTime = timePrefix;
+                        Invoke(() => LogInfo($"  Progress: {trimmedLine}"));
+                    }
+                }
+            }
+            // Log error lines
+            else if (trimmedLine.Contains("Error") || trimmedLine.Contains("error"))
+            {
+                Invoke(() => LogInfo($"  {trimmedLine}"));
+            }
         }
 
         private static string? ParseFFmpegTime(string line)
