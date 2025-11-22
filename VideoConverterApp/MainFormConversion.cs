@@ -139,13 +139,13 @@ namespace VideoConverterApp
                     if (filters.Count > 0)
                     {
                         string vf = string.Join(",", filters);
-                        args = $"-i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
+                        args = $"-y -i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
                     }
                     else
                     {
                         // No filters, just re-encode
                         LogInfo("  Re-encoding only (no scaling or color adjustments)");
-                        args = $"-i \"{inputPath}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
+                        args = $"-y -i \"{inputPath}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
                     }
 
                     success = await RunFFmpegAsync(args);
