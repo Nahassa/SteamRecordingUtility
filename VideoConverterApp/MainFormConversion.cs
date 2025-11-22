@@ -270,18 +270,43 @@ namespace VideoConverterApp
                         return false;
                     }
 
-                    string stderr = process.StandardError.ReadToEnd();
+                    // Read stderr line-by-line for real-time progress logging
+                    var errorLines = new List<string>();
+                    string? line;
+                    while ((line = process.StandardError.ReadLine()) != null)
+                    {
+                        string trimmedLine = line.Trim();
+                        if (!string.IsNullOrWhiteSpace(trimmedLine))
+                        {
+                            errorLines.Add(trimmedLine);
+
+                            // Parse progress info (FFmpeg outputs lines like: frame=123 fps=30 ... time=00:01:23.45 ...)
+                            if (trimmedLine.Contains("time="))
+                            {
+                                string? timeInfo = ParseFFmpegTime(trimmedLine);
+                                if (timeInfo != null)
+                                {
+                                    Invoke(() => lblCurrentTask.Text = $"Encoding: {timeInfo}");
+                                }
+                            }
+                            // Log encoding info lines (skip verbose header info)
+                            else if (trimmedLine.StartsWith("frame=") ||
+                                     trimmedLine.Contains("Error") ||
+                                     trimmedLine.Contains("error"))
+                            {
+                                Invoke(() => LogInfo($"  {trimmedLine}"));
+                            }
+                        }
+                    }
+
                     process.WaitForExit();
 
                     if (process.ExitCode != 0)
                     {
-                        var errorLines = stderr.Split('\n')
-                            .Where(line => !string.IsNullOrWhiteSpace(line))
-                            .TakeLast(5);
-
-                        foreach (var line in errorLines)
+                        // Log the last few error lines
+                        foreach (var errorLine in errorLines.TakeLast(5))
                         {
-                            Invoke(() => LogError($"  {line.Trim()}"));
+                            Invoke(() => LogError($"  {errorLine}"));
                         }
                     }
 
@@ -297,6 +322,27 @@ namespace VideoConverterApp
                     return false;
                 }
             });
+        }
+
+        private static string? ParseFFmpegTime(string line)
+        {
+            // Parse time from FFmpeg progress output: "time=00:01:23.45"
+            int timeIndex = line.IndexOf("time=");
+            if (timeIndex >= 0)
+            {
+                int start = timeIndex + 5;
+                int end = line.IndexOf(' ', start);
+                if (end < 0) end = line.Length;
+
+                string timeStr = line.Substring(start, end - start);
+                // Clean up the time string (remove any trailing characters)
+                if (timeStr.Contains("bitrate"))
+                {
+                    timeStr = timeStr.Split("bitrate")[0].Trim();
+                }
+                return timeStr;
+            }
+            return null;
         }
 
         private bool IsFFmpegAvailable()
