@@ -13,6 +13,7 @@ namespace VideoConverterApp
         public double Saturation { get; set; } = 1.2;
         public int CRF { get; set; } = 18;
         public int Bitrate { get; set; } = 20000;
+        public string VideoEncoder { get; set; } = "libx265"; // libx265, hevc_nvenc, hevc_nvenc_hq
         public bool MoveProcessedFiles { get; set; } = true;
 
         // Processing Options

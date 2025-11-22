@@ -13,6 +13,14 @@ namespace VideoConverterApp
             numBitrate.Value = settings.Bitrate;
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
+            // Encoder selection
+            cmbEncoder.SelectedIndex = settings.VideoEncoder switch
+            {
+                "hevc_nvenc" => 1,
+                "hevc_nvenc_hq" => 2,
+                _ => 0 // libx265 (default)
+            };
+
             // Processing options
             chkEnableConversion.Checked = settings.EnableVideoConversion;
             chkEnableScaling.Checked = settings.EnableScaling;
@@ -28,6 +36,14 @@ namespace VideoConverterApp
             settings.CRF = (int)numCRF.Value;
             settings.Bitrate = (int)numBitrate.Value;
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
+
+            // Encoder selection
+            settings.VideoEncoder = cmbEncoder.SelectedIndex switch
+            {
+                1 => "hevc_nvenc",
+                2 => "hevc_nvenc_hq",
+                _ => "libx265"
+            };
 
             // Processing options
             settings.EnableVideoConversion = chkEnableConversion.Checked;

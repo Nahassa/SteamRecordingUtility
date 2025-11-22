@@ -134,18 +134,23 @@ namespace VideoConverterApp
                         LogInfo($"  Color: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
                     }
 
+                    // Get effective encoder (with NVENC fallback if needed)
+                    string encoder = GetEffectiveEncoder();
+                    string encoderArgs = GetEncoderArguments(encoder, (int)numCRF.Value, (int)numBitrate.Value);
+                    LogInfo($"  Encoder: {encoder}");
+
                     // Build FFmpeg command
                     string args;
                     if (filters.Count > 0)
                     {
                         string vf = string.Join(",", filters);
-                        args = $"-y -i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
+                        args = $"-y -i \"{inputPath}\" -vf \"{vf}\" {encoderArgs} \"{outputPath}\"";
                     }
                     else
                     {
                         // No filters, just re-encode
                         LogInfo("  Re-encoding only (no scaling or color adjustments)");
-                        args = $"-y -i \"{inputPath}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
+                        args = $"-y -i \"{inputPath}\" {encoderArgs} \"{outputPath}\"";
                     }
 
                     success = await RunFFmpegAsync(args);
@@ -406,6 +411,70 @@ namespace VideoConverterApp
             {
                 return false;
             }
+        }
+
+        private bool? _nvencAvailable = null;
+
+        private bool IsNvencAvailable()
+        {
+            // Cache the result to avoid repeated checks
+            if (_nvencAvailable.HasValue)
+                return _nvencAvailable.Value;
+
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = "-encoders",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using Process? process = Process.Start(psi);
+                if (process == null)
+                {
+                    _nvencAvailable = false;
+                    return false;
+                }
+
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+
+                _nvencAvailable = output.Contains("hevc_nvenc");
+                return _nvencAvailable.Value;
+            }
+            catch
+            {
+                _nvencAvailable = false;
+                return false;
+            }
+        }
+
+        private string GetEncoderArguments(string encoder, int crf, int bitrate)
+        {
+            return encoder switch
+            {
+                "hevc_nvenc" => $"-c:v hevc_nvenc -preset p4 -cq {crf} -pix_fmt yuv420p -b:v {bitrate}k",
+                "hevc_nvenc_hq" => $"-c:v hevc_nvenc -preset p7 -tune hq -rc vbr -cq {crf} -spatial-aq 1 -temporal-aq 1 -rc-lookahead 32 -b_ref_mode middle -pix_fmt yuv420p -b:v {bitrate}k",
+                _ => $"-c:v libx265 -preset slow -pix_fmt yuv420p -crf {crf} -b:v {bitrate}k" // libx265 (default)
+            };
+        }
+
+        private string GetEffectiveEncoder()
+        {
+            string requestedEncoder = settings.VideoEncoder;
+
+            // If NVENC requested but not available, fall back to libx265
+            if ((requestedEncoder == "hevc_nvenc" || requestedEncoder == "hevc_nvenc_hq") && !IsNvencAvailable())
+            {
+                LogWarning("NVENC encoder not available. Falling back to CPU encoder (libx265).");
+                return "libx265";
+            }
+
+            return requestedEncoder;
         }
 
         private void LogInfo(string message)
