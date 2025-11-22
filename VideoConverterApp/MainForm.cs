@@ -21,6 +21,7 @@ namespace VideoConverterApp
         private Button btnYouTubeSettings = null!;
         private Button btnLoadVideos = null!;
         private Button btnConvertAll = null!;
+        private Button btnFixTimelines = null!;
         private Button btnShowLog = null!;
 
         // Split container for resizable layout
@@ -54,6 +55,11 @@ namespace VideoConverterApp
         private NumericUpDown numCRF = null!;
         private NumericUpDown numBitrate = null!;
         private CheckBox chkMoveProcessed = null!;
+
+        // Processing option checkboxes
+        private CheckBox chkEnableConversion = null!;
+        private CheckBox chkEnableScaling = null!;
+        private CheckBox chkEnableColorAdjustments = null!;
 
         // Progress and status bar (log moved to separate dialog)
         private ProgressBar progressBar = null!;
@@ -94,7 +100,7 @@ namespace VideoConverterApp
 
         private void InitializeComponent()
         {
-            this.Text = "Steam Recording Video Converter";
+            this.Text = "SteamRec Utility";
             this.Size = new Size(1200, 700);
             // Minimum width to prevent horizontal scrollbars (based on content widths)
             // Video list (250) + Thumbnails (460) + Settings (350) + margins (60) = 1120
@@ -209,6 +215,15 @@ namespace VideoConverterApp
             };
             btnConvertAll.Click += BtnConvertAll_Click;
 
+            btnFixTimelines = new Button
+            {
+                Text = "Fix Timelines",
+                Location = new Point(10 + labelWidth + 5 + 230, y),
+                Width = 110,
+                Height = 28
+            };
+            btnFixTimelines.Click += BtnFixTimelines_Click;
+
             btnShowLog = new Button
             {
                 Text = "Show Log...",
@@ -218,7 +233,7 @@ namespace VideoConverterApp
             };
             btnShowLog.Click += BtnShowLog_Click;
 
-            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnShowLog });
+            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnFixTimelines, btnShowLog });
 
             // Position anchored buttons after adding to panel
             UpdateTopPanelButtonPositions();
@@ -611,6 +626,53 @@ namespace VideoConverterApp
             };
 
             settingsContainer.Controls.Add(chkMoveProcessed);
+            y += 30;
+
+            // Processing options
+            var lblProcessingOptions = new Label
+            {
+                Text = "Processing Options:",
+                Location = new Point(10, y),
+                Width = 280,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold)
+            };
+            settingsContainer.Controls.Add(lblProcessingOptions);
+            y += 22;
+
+            chkEnableConversion = new CheckBox
+            {
+                Text = "Enable video conversion",
+                Location = new Point(10, y),
+                Width = 200,
+                Checked = settings.EnableVideoConversion
+            };
+            chkEnableConversion.CheckedChanged += ChkEnableConversion_CheckedChanged;
+            settingsContainer.Controls.Add(chkEnableConversion);
+            y += 24;
+
+            chkEnableScaling = new CheckBox
+            {
+                Text = "Enable scaling",
+                Location = new Point(10, y),
+                Width = 200,
+                Checked = settings.EnableScaling
+            };
+            chkEnableScaling.CheckedChanged += ChkEnableScaling_CheckedChanged;
+            settingsContainer.Controls.Add(chkEnableScaling);
+            y += 24;
+
+            chkEnableColorAdjustments = new CheckBox
+            {
+                Text = "Enable color adjustments",
+                Location = new Point(10, y),
+                Width = 200,
+                Checked = settings.EnableColorAdjustments
+            };
+            chkEnableColorAdjustments.CheckedChanged += ChkEnableColorAdjustments_CheckedChanged;
+            settingsContainer.Controls.Add(chkEnableColorAdjustments);
+
+            // Apply initial enable/disable state
+            UpdateProcessingControlsEnabled();
         }
 
         private void CreateStatusBar()
@@ -739,6 +801,115 @@ namespace VideoConverterApp
                 youtubeUploader = dlg.YouTubeUploader;
                 SaveSettings();
             }
+        }
+
+        private void BtnFixTimelines_Click(object? sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtInputFolder.Text))
+            {
+                MessageBox.Show("Please select an input folder first.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (!Directory.Exists(txtInputFolder.Text))
+            {
+                MessageBox.Show("Input folder does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Show the log dialog
+            if (logDialog != null && !logDialog.Visible)
+            {
+                logDialog.Show(this);
+            }
+
+            txtLog.Clear();
+
+            var result = TimelineFixer.FixTimelines(txtInputFolder.Text, (message, color) =>
+            {
+                if (InvokeRequired)
+                {
+                    Invoke(() =>
+                    {
+                        txtLog.SelectionColor = color;
+                        txtLog.AppendText(message + Environment.NewLine);
+                        txtLog.ScrollToCaret();
+                    });
+                }
+                else
+                {
+                    txtLog.SelectionColor = color;
+                    txtLog.AppendText(message + Environment.NewLine);
+                    txtLog.ScrollToCaret();
+                }
+            });
+
+            if (result.Fixed > 0)
+            {
+                MessageBox.Show(
+                    $"Fixed {result.Fixed} timeline file(s).\n\nRemember to restart Steam for changes to take effect!",
+                    "Timeline Fix Complete",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+            else if (result.Errors > 0)
+            {
+                MessageBox.Show(
+                    $"Encountered {result.Errors} error(s). Check the log for details.",
+                    "Timeline Fix Complete",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+            else
+            {
+                MessageBox.Show(
+                    "All timeline files are already valid.",
+                    "Timeline Fix Complete",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+        }
+
+        private void ChkEnableConversion_CheckedChanged(object? sender, EventArgs e)
+        {
+            settings.EnableVideoConversion = chkEnableConversion.Checked;
+            UpdateProcessingControlsEnabled();
+        }
+
+        private void ChkEnableScaling_CheckedChanged(object? sender, EventArgs e)
+        {
+            settings.EnableScaling = chkEnableScaling.Checked;
+            UpdateProcessingControlsEnabled();
+        }
+
+        private void ChkEnableColorAdjustments_CheckedChanged(object? sender, EventArgs e)
+        {
+            settings.EnableColorAdjustments = chkEnableColorAdjustments.Checked;
+            UpdateProcessingControlsEnabled();
+        }
+
+        private void UpdateProcessingControlsEnabled()
+        {
+            bool conversionEnabled = chkEnableConversion.Checked;
+            bool scalingEnabled = conversionEnabled && chkEnableScaling.Checked;
+            bool colorEnabled = conversionEnabled && chkEnableColorAdjustments.Checked;
+
+            // Scaling controls
+            chkEnableScaling.Enabled = conversionEnabled;
+            cmbResolution.Enabled = scalingEnabled;
+
+            // Color adjustment controls
+            chkEnableColorAdjustments.Enabled = conversionEnabled;
+            trackBrightness.Enabled = colorEnabled;
+            trackContrast.Enabled = colorEnabled;
+            trackSaturation.Enabled = colorEnabled;
+            btnRefreshPreview.Enabled = colorEnabled;
+            btnApplyToAll.Enabled = colorEnabled;
+            btnReset.Enabled = colorEnabled;
+
+            // Conversion quality controls
+            numCRF.Enabled = conversionEnabled;
+            numBitrate.Enabled = conversionEnabled;
         }
 
         // Event handlers and core logic continued in partial classes...

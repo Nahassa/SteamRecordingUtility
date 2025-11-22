@@ -15,6 +15,11 @@ namespace VideoConverterApp
         public int Bitrate { get; set; } = 20000;
         public bool MoveProcessedFiles { get; set; } = true;
 
+        // Processing Options
+        public bool EnableVideoConversion { get; set; } = true;
+        public bool EnableScaling { get; set; } = true;
+        public bool EnableColorAdjustments { get; set; } = true;
+
         // YouTube Settings
         public bool EnableYouTubeUpload { get; set; } = false;
         public string YouTubeTitleTemplate { get; set; } = "{filename}";

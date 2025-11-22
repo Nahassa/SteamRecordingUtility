@@ -13,6 +13,11 @@ namespace VideoConverterApp
             numBitrate.Value = settings.Bitrate;
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
+            // Processing options
+            chkEnableConversion.Checked = settings.EnableVideoConversion;
+            chkEnableScaling.Checked = settings.EnableScaling;
+            chkEnableColorAdjustments.Checked = settings.EnableColorAdjustments;
+
             // YouTube settings are now handled in the YouTubeSettingsDialog
         }
 
@@ -23,6 +28,11 @@ namespace VideoConverterApp
             settings.CRF = (int)numCRF.Value;
             settings.Bitrate = (int)numBitrate.Value;
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
+
+            // Processing options
+            settings.EnableVideoConversion = chkEnableConversion.Checked;
+            settings.EnableScaling = chkEnableScaling.Checked;
+            settings.EnableColorAdjustments = chkEnableColorAdjustments.Checked;
 
             // YouTube settings are saved by the YouTubeSettingsDialog
             settings.Save();
