@@ -14,6 +14,8 @@ namespace VideoConverterApp
         private TextBox txtTags = null!;
         private ComboBox cmbPrivacy = null!;
         private ComboBox cmbCategory = null!;
+        private CheckBox chkMadeForKids = null!;
+        private CheckBox chkAgeRestricted = null!;
         private Button btnAuth = null!;
         private Label lblStatus = null!;
         private Button btnOK = null!;
@@ -47,7 +49,7 @@ namespace VideoConverterApp
         private void InitializeComponent()
         {
             this.Text = "YouTube Upload Settings";
-            this.Size = new Size(600, 550);
+            this.Size = new Size(600, 585);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -84,7 +86,7 @@ namespace VideoConverterApp
 
             var lblTitleHelp = new Label
             {
-                Text = "Use {filename}, {recording_date} (from filename), {date} (current date)",
+                Text = "Use {filename}, {date} (current date), {datetime}, {year}, {month}, {day}",
                 Location = new Point(145, y),
                 Width = controlWidth,
                 ForeColor = Color.Gray,
@@ -155,6 +157,26 @@ namespace VideoConverterApp
             cmbCategory.Text = categoryDisplay;
 
             this.Controls.AddRange(new Control[] { lblCategory, cmbCategory });
+
+            y += 35;
+
+            // Audience settings
+            var lblAudience = new Label { Text = "Audience:", Location = new Point(15, y + 3), Width = labelWidth };
+            chkMadeForKids = new CheckBox
+            {
+                Text = "Made for kids",
+                Location = new Point(145, y),
+                Width = 130,
+                Checked = settings.YouTubeMadeForKids
+            };
+            chkAgeRestricted = new CheckBox
+            {
+                Text = "Age restricted (18+)",
+                Location = new Point(280, y),
+                Width = 150,
+                Checked = settings.YouTubeAgeRestricted
+            };
+            this.Controls.AddRange(new Control[] { lblAudience, chkMadeForKids, chkAgeRestricted });
 
             y += 35;
 
@@ -238,6 +260,8 @@ namespace VideoConverterApp
             txtTags.Enabled = enabled;
             cmbPrivacy.Enabled = enabled;
             cmbCategory.Enabled = enabled;
+            chkMadeForKids.Enabled = enabled;
+            chkAgeRestricted.Enabled = enabled;
             btnAuth.Enabled = enabled;
         }
 
@@ -292,6 +316,9 @@ namespace VideoConverterApp
             string categoryText = cmbCategory.Text;
             string categoryId = categoryText.Split('(').Last().TrimEnd(')');
             settings.YouTubeCategoryId = categoryId;
+
+            settings.YouTubeMadeForKids = chkMadeForKids.Checked;
+            settings.YouTubeAgeRestricted = chkAgeRestricted.Checked;
 
             settings.Save();
         }

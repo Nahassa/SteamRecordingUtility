@@ -160,6 +160,8 @@ namespace VideoConverterApp
                             tags,
                             settings.YouTubePrivacyStatus,
                             settings.YouTubeCategoryId,
+                            settings.YouTubeMadeForKids,
+                            settings.YouTubeAgeRestricted,
                             uploadProgress);
 
                         if (uploadSuccess && videoUrl != null)

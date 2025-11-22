@@ -136,6 +136,8 @@ namespace VideoConverterApp
             string[] tags,
             string privacyStatus,
             string categoryId,
+            bool madeForKids = false,
+            bool ageRestricted = false,
             IProgress<int>? progress = null)
         {
             if (youtubeService == null)
@@ -156,30 +158,25 @@ namespace VideoConverterApp
                     },
                     Status = new VideoStatus
                     {
-                        PrivacyStatus = privacyStatus
+                        PrivacyStatus = privacyStatus,
+                        SelfDeclaredMadeForKids = madeForKids
                     }
                 };
 
-                // Try to extract recording date from filename and set it in RecordingDetails
-                string fileName = Path.GetFileNameWithoutExtension(filePath);
-                string recordingDateStr = ExtractRecordingDate(fileName);
-                string parts = "snippet,status";
-
-                if (!string.IsNullOrEmpty(recordingDateStr) &&
-                    DateTime.TryParseExact(recordingDateStr, "yyyy-MM-dd",
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        System.Globalization.DateTimeStyles.None,
-                        out DateTime recordingDate))
+                // Set age restriction if requested (requires content rating)
+                if (ageRestricted)
                 {
-                    video.RecordingDetails = new VideoRecordingDetails
+                    video.ContentDetails = new VideoContentDetails
                     {
-                        RecordingDateDateTimeOffset = new DateTimeOffset(recordingDate)
+                        ContentRating = new ContentRating
+                        {
+                            YtRating = "ytAgeRestricted"
+                        }
                     };
-                    parts = "snippet,status,recordingDetails";
                 }
 
                 using var fileStream = new FileStream(filePath, FileMode.Open);
-                var videosInsertRequest = youtubeService.Videos.Insert(video, parts, fileStream, "video/*");
+                var videosInsertRequest = youtubeService.Videos.Insert(video, "snippet,status", fileStream, "video/*");
 
                 videosInsertRequest.ProgressChanged += (uploadProgress) =>
                 {
