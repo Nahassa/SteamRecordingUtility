@@ -69,6 +69,7 @@ namespace VideoConverterApp
                 btnConvertAll.Enabled = true;
                 btnLoadVideos.Enabled = true;
                 lblProgress.Text = "Ready";
+                lblCurrentTask.Text = "";
             }
         }
 
@@ -103,27 +104,63 @@ namespace VideoConverterApp
                 string outputPath = Path.Combine(outputFolder, fileName);
                 string processedPath = Path.Combine(processedFolder, fileName);
 
-                lblProgress.Text = $"Converting {i + 1}/{videos.Count}: {fileName}";
+                lblProgress.Text = $"Processing {i + 1}/{videos.Count}";
+                lblCurrentTask.Text = fileName;
                 LogInfo($"[{i + 1}/{videos.Count}] Processing: {fileName}");
-                LogInfo($"  Settings: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
 
-                // Build ffmpeg command with optimal quality settings
-                string brightnessStr = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
-                string contrastStr = video.Contrast.ToString("0.00", CultureInfo.InvariantCulture);
-                string saturationStr = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
+                bool success;
 
-                // Important: Do scaling in the filter chain (not with -s) to avoid double resampling
-                // Use lanczos for high-quality scaling, then apply other filters
-                string vf = $"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos,setdar=16/9,eq=brightness={brightnessStr}:contrast={contrastStr}:saturation={saturationStr}";
+                // Check if video conversion is enabled
+                if (settings.EnableVideoConversion)
+                {
+                    // Build dynamic filter chain based on enabled options
+                    var filters = new List<string>();
 
-                // Use -preset slow for better quality/compression (trades encoding time for quality)
-                string args = $"-i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
+                    // Scaling filter (if enabled)
+                    if (settings.EnableScaling)
+                    {
+                        filters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
+                        filters.Add("setdar=16/9");
+                        LogInfo($"  Scaling: {video.OutputWidth}x{video.OutputHeight}");
+                    }
 
-                bool success = await RunFFmpegAsync(args);
+                    // Color adjustment filter (if enabled)
+                    if (settings.EnableColorAdjustments)
+                    {
+                        string brightnessStr = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
+                        string contrastStr = video.Contrast.ToString("0.00", CultureInfo.InvariantCulture);
+                        string saturationStr = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
+                        filters.Add($"eq=brightness={brightnessStr}:contrast={contrastStr}:saturation={saturationStr}");
+                        LogInfo($"  Color: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
+                    }
+
+                    // Build FFmpeg command
+                    string args;
+                    if (filters.Count > 0)
+                    {
+                        string vf = string.Join(",", filters);
+                        args = $"-y -i \"{inputPath}\" -vf \"{vf}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
+                    }
+                    else
+                    {
+                        // No filters, just re-encode
+                        LogInfo("  Re-encoding only (no scaling or color adjustments)");
+                        args = $"-y -i \"{inputPath}\" -c:v libx265 -preset slow -pix_fmt yuv420p -crf {numCRF.Value} -b:v {numBitrate.Value}k \"{outputPath}\"";
+                    }
+
+                    success = await RunFFmpegAsync(args);
+                }
+                else
+                {
+                    // No conversion - just copy file to output (for YouTube upload only workflow)
+                    LogInfo("  Copying file (conversion disabled)");
+                    File.Copy(inputPath, outputPath, true);
+                    success = true;
+                }
 
                 if (success)
                 {
-                    LogSuccess($"Successfully converted: {fileName}");
+                    LogSuccess($"Successfully processed: {fileName}");
 
                     // Move original to processed folder
                     if (chkMoveProcessed.Checked)
@@ -135,7 +172,8 @@ namespace VideoConverterApp
                     // Upload to YouTube if enabled
                     if (settings.EnableYouTubeUpload && youtubeUploader != null)
                     {
-                        lblProgress.Text = $"Uploading {i + 1}/{videos.Count} to YouTube: {fileName}";
+                        lblProgress.Text = $"Uploading {i + 1}/{videos.Count} to YouTube";
+                        lblCurrentTask.Text = fileName;
                         LogInfo("  Uploading to YouTube...");
 
                         string title = youtubeUploader.ProcessTemplate(settings.YouTubeTitleTemplate, outputPath);
@@ -157,6 +195,8 @@ namespace VideoConverterApp
                             tags,
                             settings.YouTubePrivacyStatus,
                             settings.YouTubeCategoryId,
+                            settings.YouTubeMadeForKids,
+                            settings.YouTubeAgeRestricted,
                             uploadProgress);
 
                         if (uploadSuccess && videoUrl != null)
@@ -219,8 +259,8 @@ namespace VideoConverterApp
                         Arguments = arguments,
                         UseShellExecute = false,
                         CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
+                        RedirectStandardOutput = false, // Don't redirect stdout - prevents deadlock
+                        RedirectStandardError = true    // FFmpeg outputs progress/errors to stderr
                     };
 
                     using Process? process = Process.Start(psi);

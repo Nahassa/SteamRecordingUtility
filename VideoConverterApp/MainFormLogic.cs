@@ -13,6 +13,11 @@ namespace VideoConverterApp
             numBitrate.Value = settings.Bitrate;
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
+            // Processing options
+            chkEnableConversion.Checked = settings.EnableVideoConversion;
+            chkEnableScaling.Checked = settings.EnableScaling;
+            chkEnableColorAdjustments.Checked = settings.EnableColorAdjustments;
+
             // YouTube settings are now handled in the YouTubeSettingsDialog
         }
 
@@ -23,6 +28,11 @@ namespace VideoConverterApp
             settings.CRF = (int)numCRF.Value;
             settings.Bitrate = (int)numBitrate.Value;
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
+
+            // Processing options
+            settings.EnableVideoConversion = chkEnableConversion.Checked;
+            settings.EnableScaling = chkEnableScaling.Checked;
+            settings.EnableColorAdjustments = chkEnableColorAdjustments.Checked;
 
             // YouTube settings are saved by the YouTubeSettingsDialog
             settings.Save();
@@ -58,6 +68,7 @@ namespace VideoConverterApp
 
             btnLoadVideos.Enabled = false;
             lblProgress.Text = "Loading videos...";
+            lblCurrentTask.Text = txtInputFolder.Text;
             lstVideos.Items.Clear();
 
             // Clear preview images from PictureBoxes to release references
@@ -99,6 +110,7 @@ namespace VideoConverterApp
                 }
 
                 lblProgress.Text = $"Loaded {videoItems.Count} video(s)";
+                lblCurrentTask.Text = "";
                 LogInfo($"Loaded {videoItems.Count} video(s) from {txtInputFolder.Text}");
 
                 if (videoItems.Count > 0)
@@ -149,6 +161,7 @@ namespace VideoConverterApp
             if (currentVideo == null) return;
 
             lblProgress.Text = "Loading previews...";
+            lblCurrentTask.Text = currentVideo.FileName;
             btnRefreshPreview.Enabled = false;
 
             try
@@ -169,6 +182,7 @@ namespace VideoConverterApp
                 await RegenerateFilteredPreviewsAsync();
 
                 lblProgress.Text = "Ready";
+                lblCurrentTask.Text = "";
             }
             catch (Exception ex)
             {

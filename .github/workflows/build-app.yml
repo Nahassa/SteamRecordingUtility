@@ -1,4 +1,4 @@
-name: Build VideoConverterApp
+name: Build SteamRec Utility
 
 on:
   push:
@@ -50,19 +50,19 @@ jobs:
       shell: pwsh
       run: |
         $version = "${{ steps.get_version.outputs.VERSION }}"
-        Copy-Item "build/VideoConverterApp.exe" "build/VideoConverterApp-$version-win-x64.exe"
+        Copy-Item "build/SteamRecUtility.exe" "build/SteamRecUtility-$version-win-x64.exe"
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
-        name: VideoConverterApp-${{ steps.get_version.outputs.VERSION }}
-        path: build/VideoConverterApp-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
+        name: SteamRecUtility-${{ steps.get_version.outputs.VERSION }}
+        path: build/SteamRecUtility-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
         retention-days: 30
 
     - name: Upload to release
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v1
       with:
-        files: build/VideoConverterApp-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
+        files: build/SteamRecUtility-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

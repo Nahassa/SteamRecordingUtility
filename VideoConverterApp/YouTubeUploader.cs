@@ -14,6 +14,64 @@ namespace VideoConverterApp
         private YouTubeService? youtubeService;
         private static readonly string[] Scopes = { YouTubeService.Scope.YoutubeUpload };
 
+        /// <summary>
+        /// Try to restore authentication from saved token (silent, no UI prompts)
+        /// </summary>
+        public async Task<bool> TryRestoreAuthenticationAsync()
+        {
+            try
+            {
+                string credPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, CredentialsFileName);
+                string tokenPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, TokenFileName);
+
+                // Check if credentials file exists
+                if (!File.Exists(credPath))
+                    return false;
+
+                // Check if token directory exists with saved tokens
+                if (!Directory.Exists(tokenPath))
+                    return false;
+
+                var tokenFiles = Directory.GetFiles(tokenPath, "Google.Apis.Auth.OAuth2.Responses.TokenResponse-*");
+                if (tokenFiles.Length == 0)
+                    return false;
+
+                // Try to load saved credentials silently
+                UserCredential credential;
+                using (var stream = new FileStream(credPath, FileMode.Open, FileAccess.Read))
+                {
+                    credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                        GoogleClientSecrets.FromStream(stream).Secrets,
+                        Scopes,
+                        "user",
+                        CancellationToken.None,
+                        new Google.Apis.Util.Store.FileDataStore(tokenPath, true));
+                }
+
+                // Check if token is valid (not expired or can be refreshed)
+                if (credential.Token.IsStale)
+                {
+                    // Try to refresh the token
+                    bool refreshed = await credential.RefreshTokenAsync(CancellationToken.None);
+                    if (!refreshed)
+                        return false;
+                }
+
+                youtubeService = new YouTubeService(new BaseClientService.Initializer()
+                {
+                    HttpClientInitializer = credential,
+                    ApplicationName = "Steam Recording Video Converter"
+                });
+
+                return true;
+            }
+            catch
+            {
+                // Silent failure - user will need to authenticate manually
+                return false;
+            }
+        }
+
         public async Task<bool> AuthenticateAsync()
         {
             try
@@ -69,6 +127,8 @@ namespace VideoConverterApp
             }
         }
 
+        public bool IsAuthenticated => youtubeService != null;
+
         public async Task<(bool success, string? videoId, string? videoUrl)> UploadVideoAsync(
             string filePath,
             string title,
@@ -76,6 +136,8 @@ namespace VideoConverterApp
             string[] tags,
             string privacyStatus,
             string categoryId,
+            bool madeForKids = false,
+            bool ageRestricted = false,
             IProgress<int>? progress = null)
         {
             if (youtubeService == null)
@@ -96,9 +158,22 @@ namespace VideoConverterApp
                     },
                     Status = new VideoStatus
                     {
-                        PrivacyStatus = privacyStatus
+                        PrivacyStatus = privacyStatus,
+                        SelfDeclaredMadeForKids = madeForKids
                     }
                 };
+
+                // Set age restriction if requested (requires content rating)
+                if (ageRestricted)
+                {
+                    video.ContentDetails = new VideoContentDetails
+                    {
+                        ContentRating = new ContentRating
+                        {
+                            YtRating = "ytAgeRestricted"
+                        }
+                    };
+                }
 
                 using var fileStream = new FileStream(filePath, FileMode.Open);
                 var videosInsertRequest = youtubeService.Videos.Insert(video, "snippet,status", fileStream, "video/*");
@@ -150,15 +225,45 @@ namespace VideoConverterApp
             string fileNameWithExt = Path.GetFileName(filePath);
             DateTime now = DateTime.Now;
 
+            // Try to extract recording date from filename (yyyy-MM-dd format)
+            string recordingDate = ExtractRecordingDate(fileName);
+
             return template
                 .Replace("{filename}", fileName)
                 .Replace("{filename_ext}", fileNameWithExt)
+                .Replace("{recording_date}", recordingDate)
                 .Replace("{date}", now.ToString("yyyy-MM-dd"))
                 .Replace("{time}", now.ToString("HH:mm:ss"))
                 .Replace("{datetime}", now.ToString("yyyy-MM-dd HH:mm:ss"))
                 .Replace("{year}", now.Year.ToString())
                 .Replace("{month}", now.Month.ToString("D2"))
                 .Replace("{day}", now.Day.ToString("D2"));
+        }
+
+        /// <summary>
+        /// Extract recording date from filename in yyyy-MM-dd format
+        /// Returns empty string if no date found
+        /// </summary>
+        private static string ExtractRecordingDate(string fileName)
+        {
+            // Match yyyy-MM-dd pattern (e.g., 2024-01-15)
+            var match = System.Text.RegularExpressions.Regex.Match(
+                fileName,
+                @"(\d{4}-\d{2}-\d{2})");
+
+            if (match.Success)
+            {
+                // Validate it's actually a valid date
+                if (DateTime.TryParseExact(match.Groups[1].Value, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out _))
+                {
+                    return match.Groups[1].Value;
+                }
+            }
+
+            return string.Empty;
         }
     }
 }

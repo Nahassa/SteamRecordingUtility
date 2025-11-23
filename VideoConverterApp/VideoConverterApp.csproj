@@ -12,6 +12,8 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <ApplicationIcon />
     <StartupObject>VideoConverterApp.Program</StartupObject>
+    <AssemblyName>SteamRecUtility</AssemblyName>
+    <Product>SteamRec Utility</Product>
   </PropertyGroup>
 
   <ItemGroup>
