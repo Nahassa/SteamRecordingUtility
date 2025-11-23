@@ -694,35 +694,35 @@ namespace VideoConverterApp
             pnlStatusBar = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 55,
+                Height = 70,
                 BorderStyle = BorderStyle.FixedSingle,
-                Padding = new Padding(10, 5, 10, 5)
+                Padding = new Padding(10, 8, 10, 8)
             };
             this.Controls.Add(pnlStatusBar);
 
-            // Progress bar at top of status bar
-            progressBar = new ProgressBar
+            // Panel for status text (add FIRST for correct dock order)
+            var pnlStatusContent = new Panel
             {
-                Dock = DockStyle.Top,
-                Height = 18,
-                Style = ProgressBarStyle.Continuous
+                Dock = DockStyle.Bottom,
+                Height = 22
             };
-            pnlStatusBar.Controls.Add(progressBar);
+            pnlStatusBar.Controls.Add(pnlStatusContent);
 
             // Spacer panel between progress bar and text
             var pnlSpacer = new Panel
             {
-                Dock = DockStyle.Top,
-                Height = 8
+                Dock = DockStyle.Bottom,
+                Height = 6
             };
             pnlStatusBar.Controls.Add(pnlSpacer);
 
-            // Panel for status text (add AFTER spacer so it appears below)
-            var pnlStatusContent = new Panel
+            // Progress bar at top of status bar (add LAST so it docks at top)
+            progressBar = new ProgressBar
             {
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
+                Style = ProgressBarStyle.Continuous
             };
-            pnlStatusBar.Controls.Add(pnlStatusContent);
+            pnlStatusBar.Controls.Add(progressBar);
 
             // Status label
             lblProgress = new Label
@@ -731,7 +731,7 @@ namespace VideoConverterApp
                 Dock = DockStyle.Left,
                 AutoSize = true,
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
-                Padding = new Padding(0, 0, 0, 0)
+                Padding = new Padding(0, 2, 0, 0)
             };
             pnlStatusContent.Controls.Add(lblProgress);
 
@@ -742,7 +742,7 @@ namespace VideoConverterApp
                 Dock = DockStyle.Fill,
                 AutoSize = false,
                 ForeColor = Color.DarkBlue,
-                Padding = new Padding(10, 0, 0, 0)
+                Padding = new Padding(10, 2, 0, 0)
             };
             pnlStatusContent.Controls.Add(lblCurrentTask);
 
