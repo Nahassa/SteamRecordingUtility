@@ -52,6 +52,7 @@ namespace VideoConverterApp
 
         // Resolution and quality
         private ComboBox cmbResolution = null!;
+        private ComboBox cmbEncoder = null!;
         private NumericUpDown numCRF = null!;
         private NumericUpDown numBitrate = null!;
         private CheckBox chkMoveProcessed = null!;
@@ -617,6 +618,19 @@ namespace VideoConverterApp
             settingsContainer.Controls.AddRange(new Control[] { lblCRF, numCRF, lblBitrate, numBitrate, lblKbps });
             y += 35;
 
+            var lblEncoder = new Label { Text = "Encoder:", Location = new Point(10, y + 3), Width = labelWidth };
+            cmbEncoder = new ComboBox
+            {
+                Location = new Point(10 + labelWidth, y),
+                Width = 200,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbEncoder.Items.AddRange(new[] { "H.265 CPU (Best Quality)", "H.265 NVENC (Fast)", "H.265 NVENC HQ (Recommended)" });
+            cmbEncoder.SelectedIndex = 0;
+
+            settingsContainer.Controls.AddRange(new Control[] { lblEncoder, cmbEncoder });
+            y += 35;
+
             chkMoveProcessed = new CheckBox
             {
                 Text = "Move original files to processed folder",
@@ -910,6 +924,7 @@ namespace VideoConverterApp
             // Conversion quality controls
             numCRF.Enabled = conversionEnabled;
             numBitrate.Enabled = conversionEnabled;
+            cmbEncoder.Enabled = conversionEnabled;
         }
 
         // Event handlers and core logic continued in partial classes...
