@@ -30,6 +30,7 @@ namespace VideoConverterApp
         public string YouTubeCategoryId { get; set; } = "20"; // 20 = Gaming
         public bool YouTubeMadeForKids { get; set; } = false;
         public bool YouTubeAgeRestricted { get; set; } = false;
+        public bool YouTubeRemoveDateFromFilename { get; set; } = false;
 
         private static readonly string SettingsFile = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,

@@ -16,6 +16,7 @@ namespace VideoConverterApp
         private ComboBox cmbCategory = null!;
         private CheckBox chkMadeForKids = null!;
         private CheckBox chkAgeRestricted = null!;
+        private CheckBox chkRemoveDateFromFilename = null!;
         private Button btnAuth = null!;
         private Label lblStatus = null!;
         private Button btnOK = null!;
@@ -49,7 +50,7 @@ namespace VideoConverterApp
         private void InitializeComponent()
         {
             this.Text = "YouTube Upload Settings";
-            this.Size = new Size(600, 585);
+            this.Size = new Size(600, 620);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -180,6 +181,19 @@ namespace VideoConverterApp
 
             y += 35;
 
+            // Filename options
+            var lblFilenameOptions = new Label { Text = "Filename:", Location = new Point(15, y + 3), Width = labelWidth };
+            chkRemoveDateFromFilename = new CheckBox
+            {
+                Text = "Remove dates from video title (e.g., 2024-01-15)",
+                Location = new Point(145, y),
+                Width = 350,
+                Checked = settings.YouTubeRemoveDateFromFilename
+            };
+            this.Controls.AddRange(new Control[] { lblFilenameOptions, chkRemoveDateFromFilename });
+
+            y += 35;
+
             // Authentication
             var lblAuth = new Label { Text = "Authentication:", Location = new Point(15, y + 3), Width = labelWidth };
             btnAuth = new Button
@@ -262,6 +276,7 @@ namespace VideoConverterApp
             cmbCategory.Enabled = enabled;
             chkMadeForKids.Enabled = enabled;
             chkAgeRestricted.Enabled = enabled;
+            chkRemoveDateFromFilename.Enabled = enabled;
             btnAuth.Enabled = enabled;
         }
 
@@ -319,6 +334,7 @@ namespace VideoConverterApp
 
             settings.YouTubeMadeForKids = chkMadeForKids.Checked;
             settings.YouTubeAgeRestricted = chkAgeRestricted.Checked;
+            settings.YouTubeRemoveDateFromFilename = chkRemoveDateFromFilename.Checked;
 
             settings.Save();
         }

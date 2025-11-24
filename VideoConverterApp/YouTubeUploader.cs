@@ -219,7 +219,7 @@ namespace VideoConverterApp
             }
         }
 
-        public string ProcessTemplate(string template, string filePath)
+        public string ProcessTemplate(string template, string filePath, bool removeDateFromFilename = false)
         {
             string fileName = Path.GetFileNameWithoutExtension(filePath);
             string fileNameWithExt = Path.GetFileName(filePath);
@@ -227,6 +227,13 @@ namespace VideoConverterApp
 
             // Try to extract recording date from filename (yyyy-MM-dd format)
             string recordingDate = ExtractRecordingDate(fileName);
+
+            // Remove date from filename if requested
+            if (removeDateFromFilename)
+            {
+                fileName = RemoveDateFromString(fileName);
+                fileNameWithExt = RemoveDateFromString(fileNameWithExt);
+            }
 
             return template
                 .Replace("{filename}", fileName)
@@ -238,6 +245,31 @@ namespace VideoConverterApp
                 .Replace("{year}", now.Year.ToString())
                 .Replace("{month}", now.Month.ToString("D2"))
                 .Replace("{day}", now.Day.ToString("D2"));
+        }
+
+        /// <summary>
+        /// Remove date patterns from a string (yyyy-MM-dd format)
+        /// Also cleans up resulting double spaces, leading/trailing separators
+        /// </summary>
+        private static string RemoveDateFromString(string input)
+        {
+            // Remove yyyy-MM-dd pattern (e.g., 2024-01-15)
+            string result = System.Text.RegularExpressions.Regex.Replace(
+                input,
+                @"\d{4}-\d{2}-\d{2}",
+                "");
+
+            // Clean up double spaces
+            result = System.Text.RegularExpressions.Regex.Replace(result, @"\s+", " ");
+
+            // Clean up leading/trailing separators and spaces
+            result = result.Trim(' ', '-', '_', '.');
+
+            // Clean up double separators (e.g., "Game -- Title" -> "Game - Title")
+            result = System.Text.RegularExpressions.Regex.Replace(result, @"[-_]{2,}", "-");
+            result = System.Text.RegularExpressions.Regex.Replace(result, @"\s*-\s*-\s*", " - ");
+
+            return result;
         }
 
         /// <summary>
