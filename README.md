@@ -1,4 +1,4 @@
-# Steam Recording Video Converter
+# Steam Recording Utility
 
 A portable Windows application for converting Steam recordings from 4:3 format with black bars to stretched 16:9 videos with per-video brightness, contrast, and saturation adjustments, preview functionality, and automatic YouTube upload.
 
