@@ -60,7 +60,7 @@ namespace VideoConverterApp
                 youtubeService = new YouTubeService(new BaseClientService.Initializer()
                 {
                     HttpClientInitializer = credential,
-                    ApplicationName = "Steam Recording Video Converter"
+                    ApplicationName = "Steam Recording Utility"
                 });
 
                 return true;
@@ -110,7 +110,7 @@ namespace VideoConverterApp
                 youtubeService = new YouTubeService(new BaseClientService.Initializer()
                 {
                     HttpClientInitializer = credential,
-                    ApplicationName = "Steam Recording Video Converter"
+                    ApplicationName = "Steam Recording Utility"
                 });
 
                 return true;

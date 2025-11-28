@@ -1,6 +1,6 @@
 # VideoConverterApp
 
-This folder contains the source code for the Steam Recording Video Converter application.
+This folder contains the source code for the Steam Recording Utility application.
 
 For full documentation, build instructions, and usage guide, see the [main README](../README.md).
 

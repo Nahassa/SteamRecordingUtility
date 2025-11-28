@@ -1,5 +1,5 @@
 @echo off
-echo Building Video Converter App (x64, Self-Contained)...
+echo Building Steam Recording Utility (x64, Self-Contained)...
 echo.
 
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=true
