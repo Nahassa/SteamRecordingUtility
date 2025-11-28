@@ -5,7 +5,7 @@ using Google.Apis.YouTube.v3;
 using Google.Apis.YouTube.v3.Data;
 using System.Diagnostics;
 
-namespace VideoConverterApp
+namespace SteamRecUtility
 {
     public class YouTubeUploader
     {

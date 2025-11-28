@@ -6,7 +6,7 @@ This guide explains how to set up YouTube upload functionality in the Steam Reco
 
 - Google Account
 - Access to Google Cloud Console
-- VideoConverterApp installed
+- Steam Recording Utility installed
 
 ## Step 1: Create a Google Cloud Project
 
@@ -43,19 +43,19 @@ This guide explains how to set up YouTube upload functionality in the Steam Reco
 ## Step 4: Install the Credentials File
 
 1. Rename the downloaded JSON file to exactly: `youtube_credentials.json`
-2. Place it in the same folder as `VideoConverterApp.exe`
+2. Place it in the same folder as `SteamRecUtility.exe`
 
 Example location:
 ```
 C:\MyApp\
-├── VideoConverterApp.exe
+├── SteamRecUtility.exe
 ├── youtube_credentials.json  ← Place here
 └── settings.json
 ```
 
 ## Step 5: Authenticate in the App
 
-1. Launch VideoConverterApp.exe
+1. Launch SteamRecUtility.exe
 2. Check "Upload converted videos to YouTube"
 3. Click "Authenticate with YouTube"
 4. Your browser will open asking you to sign in with Google

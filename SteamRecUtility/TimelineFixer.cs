@@ -1,7 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace VideoConverterApp
+namespace SteamRecUtility
 {
     public class TimelineFixer
     {

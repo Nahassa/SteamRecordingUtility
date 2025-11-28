@@ -2,7 +2,7 @@
 
 A portable Windows application for converting Steam recordings from 4:3 format with black bars to stretched 16:9 videos with per-video brightness, contrast, and saturation adjustments, preview functionality, and automatic YouTube upload.
 
-> **Source Code:** The application source is in the [`VideoConverterApp/`](VideoConverterApp/) folder.
+> **Source Code:** The application source is in the [`SteamRecUtility/`](SteamRecUtility/) folder.
 
 ## Features
 
@@ -52,24 +52,24 @@ A portable Windows application for converting Steam recordings from 4:3 format w
 This creates a single .exe file that includes all dependencies (no .NET runtime required on target machine):
 
 ```bash
-cd VideoConverterApp
+cd SteamRecUtility
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=true
 ```
 
-The executable will be in: `bin/Release/net8.0-windows/win-x64/publish/VideoConverterApp.exe`
+The executable will be in: `bin/Release/net8.0-windows/win-x64/publish/SteamRecUtility.exe`
 
 #### Option 2: Framework-Dependent (Smaller file size)
 
 Requires .NET 8.0 Runtime on the target machine:
 
 ```bash
-cd VideoConverterApp
+cd SteamRecUtility
 dotnet publish -c Release -r win-x64 --self-contained false
 ```
 
 ## Usage
 
-1. **Launch the Application** - Double-click `VideoConverterApp.exe`
+1. **Launch the Application** - Double-click `SteamRecUtility.exe`
 
 2. **Configure Folders**:
    - Click "..." button to select input folder (where your .mp4 files are)
@@ -95,7 +95,7 @@ dotnet publish -c Release -r win-x64 --self-contained false
    - Check "Upload converted videos to YouTube"
    - Configure title template, description, tags, privacy, and category
    - Click "Authenticate with YouTube" and follow the OAuth flow
-   - See [YOUTUBE_SETUP.md](VideoConverterApp/YOUTUBE_SETUP.md) for detailed setup instructions
+   - See [YOUTUBE_SETUP.md](SteamRecUtility/YOUTUBE_SETUP.md) for detailed setup instructions
 
 6. **Start Conversion** - Click "Convert All" button
 
@@ -134,7 +134,7 @@ You can edit this file directly if needed.
 The application requires FFmpeg to be available. You have two options:
 
 1. **Install FFmpeg system-wide** and add to PATH
-2. **Place ffmpeg.exe** in the same folder as VideoConverterApp.exe
+2. **Place ffmpeg.exe** in the same folder as SteamRecUtility.exe
 
 Download FFmpeg from: https://www.gyan.dev/ffmpeg/builds/
 

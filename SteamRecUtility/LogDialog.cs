@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Forms;
 
-namespace VideoConverterApp
+namespace SteamRecUtility
 {
     public class LogDialog : Form
     {

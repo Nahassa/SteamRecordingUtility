@@ -6,11 +6,11 @@ on:
       - main
       - 'claude/**'
     paths:
-      - 'VideoConverterApp/**'
+      - 'SteamRecUtility/**'
       - '.github/workflows/build-app.yml'
   pull_request:
     paths:
-      - 'VideoConverterApp/**'
+      - 'SteamRecUtility/**'
   release:
     types: [created, published]
   workflow_dispatch:  # Allow manual triggering
@@ -29,10 +29,10 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Restore dependencies
-      run: dotnet restore VideoConverterApp/VideoConverterApp.csproj
+      run: dotnet restore SteamRecUtility/SteamRecUtility.csproj
 
     - name: Build application
-      run: dotnet publish VideoConverterApp/VideoConverterApp.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=true -o build/
+      run: dotnet publish SteamRecUtility/SteamRecUtility.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=true -o build/
 
     - name: Get version from tag or commit
       id: get_version
