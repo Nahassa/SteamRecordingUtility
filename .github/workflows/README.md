@@ -79,3 +79,47 @@ No setup required - GitHub Actions provides everything needed:
 - Build time is typically 2-5 minutes
 - The executable is fully portable (self-contained)
 - No secrets or tokens needed (except for release uploads, which use the automatic `GITHUB_TOKEN`)
+
+---
+
+## cleanup-artifacts.yml
+
+Automatically removes old workflow artifacts to save storage space.
+
+### When It Runs
+
+- **Manual trigger only** - Must be run manually from the Actions tab
+- Optional scheduled run on Sundays at 00:00 UTC (commented out by default)
+
+### What It Does
+
+1. **Identifies old artifacts** - Finds artifacts older than 10 days
+2. **Preserves recent artifacts** - Always keeps the 5 most recent artifacts
+3. **Deletes old artifacts** - Removes artifacts matching the criteria
+
+### Cleanup Policy
+
+- **Age threshold:** 10 days
+- **Keep recent:** Always preserves the 5 most recent artifacts
+- **Note:** The main build workflow already sets artifacts to expire after 30 days
+
+### Manual Triggering
+
+To manually clean up old artifacts:
+
+1. Go to "Actions" tab
+2. Select "Cleanup Old Artifacts" workflow
+3. Click "Run workflow"
+4. Select the branch
+5. Click "Run workflow" button
+
+### Why This Workflow Exists
+
+GitHub has storage limits for artifacts. This workflow helps:
+- Reduce storage usage
+- Keep only relevant recent builds
+- Maintain a clean artifacts history
+
+### Requirements
+
+- Requires `actions: write` permission (automatically granted by `GITHUB_TOKEN`)
