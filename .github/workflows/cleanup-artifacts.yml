@@ -2,9 +2,9 @@ name: Cleanup Old Artifacts
 
 on:
   workflow_dispatch:  # Manual trigger only
-  schedule:
-    # Optional: Run weekly on Sundays at 00:00 UTC (commented out by default)
-    # - cron: '0 0 * * 0'
+  # Uncomment to run automatically on schedule:
+  # schedule:
+  #   - cron: '0 0 * * 0'  # Weekly on Sundays at 00:00 UTC
 
 jobs:
   cleanup:
