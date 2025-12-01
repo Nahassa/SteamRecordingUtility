@@ -31,6 +31,7 @@ namespace SteamRecUtility
         public bool YouTubeMadeForKids { get; set; } = false;
         public bool YouTubeAgeRestricted { get; set; } = false;
         public bool YouTubeRemoveDateFromFilename { get; set; } = false;
+        public string YouTubeRemoveTextPatterns { get; set; } = string.Empty; // Comma-separated text to remove
 
         private static readonly string SettingsFile = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,

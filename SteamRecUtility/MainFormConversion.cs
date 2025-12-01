@@ -181,8 +181,16 @@ namespace SteamRecUtility
                         lblCurrentTask.Text = fileName;
                         LogInfo("  Uploading to YouTube...");
 
-                        string title = youtubeUploader.ProcessTemplate(settings.YouTubeTitleTemplate, outputPath, settings.YouTubeRemoveDateFromFilename);
-                        string description = youtubeUploader.ProcessTemplate(settings.YouTubeDescriptionTemplate, outputPath, settings.YouTubeRemoveDateFromFilename);
+                        string title = youtubeUploader.ProcessTemplate(
+                            settings.YouTubeTitleTemplate,
+                            outputPath,
+                            settings.YouTubeRemoveDateFromFilename,
+                            settings.YouTubeRemoveTextPatterns);
+                        string description = youtubeUploader.ProcessTemplate(
+                            settings.YouTubeDescriptionTemplate,
+                            outputPath,
+                            settings.YouTubeRemoveDateFromFilename,
+                            settings.YouTubeRemoveTextPatterns);
                         string[] tags = settings.YouTubeTags.Split(',').Select(t => t.Trim()).ToArray();
 
                         var uploadProgress = new Progress<int>(percent =>

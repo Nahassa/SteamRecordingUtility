@@ -219,7 +219,7 @@ namespace SteamRecUtility
             }
         }
 
-        public string ProcessTemplate(string template, string filePath, bool removeDateFromFilename = false)
+        public string ProcessTemplate(string template, string filePath, bool removeDateFromFilename = false, string removeTextPatterns = "")
         {
             string fileName = Path.GetFileNameWithoutExtension(filePath);
             string fileNameWithExt = Path.GetFileName(filePath);
@@ -228,14 +228,8 @@ namespace SteamRecUtility
             // Try to extract recording date from filename (yyyy-MM-dd format)
             string recordingDate = ExtractRecordingDate(fileName);
 
-            // Remove date from filename if requested
-            if (removeDateFromFilename)
-            {
-                fileName = RemoveDateFromString(fileName);
-                fileNameWithExt = RemoveDateFromString(fileNameWithExt);
-            }
-
-            return template
+            // Process template variables first
+            string result = template
                 .Replace("{filename}", fileName)
                 .Replace("{filename_ext}", fileNameWithExt)
                 .Replace("{recording_date}", recordingDate)
@@ -245,6 +239,57 @@ namespace SteamRecUtility
                 .Replace("{year}", now.Year.ToString())
                 .Replace("{month}", now.Month.ToString("D2"))
                 .Replace("{day}", now.Day.ToString("D2"));
+
+            // Remove date patterns if requested
+            if (removeDateFromFilename)
+            {
+                result = RemoveDateFromString(result);
+            }
+
+            // Remove custom text patterns
+            if (!string.IsNullOrWhiteSpace(removeTextPatterns))
+            {
+                result = RemoveCustomTextPatterns(result, removeTextPatterns);
+            }
+
+            // Always trim whitespace at the end
+            result = result.Trim();
+
+            return result;
+        }
+
+        /// <summary>
+        /// Remove custom text patterns from string based on comma-separated list
+        /// </summary>
+        private static string RemoveCustomTextPatterns(string input, string patterns)
+        {
+            if (string.IsNullOrWhiteSpace(input) || string.IsNullOrWhiteSpace(patterns))
+                return input;
+
+            string result = input;
+
+            // Split by comma and process each pattern
+            var patternList = patterns.Split(',')
+                .Select(p => p.Trim())
+                .Where(p => !string.IsNullOrWhiteSpace(p));
+
+            foreach (var pattern in patternList)
+            {
+                // Remove all occurrences of the pattern (case-insensitive)
+                result = System.Text.RegularExpressions.Regex.Replace(
+                    result,
+                    System.Text.RegularExpressions.Regex.Escape(pattern),
+                    "",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+
+            // Clean up extra spaces and separators
+            result = System.Text.RegularExpressions.Regex.Replace(result, @"\s+", " ");
+            result = result.Trim(' ', '-', '_', '.');
+            result = System.Text.RegularExpressions.Regex.Replace(result, @"[-_]{2,}", "-");
+            result = System.Text.RegularExpressions.Regex.Replace(result, @"\s*-\s*-\s*", " - ");
+
+            return result.Trim();
         }
 
         /// <summary>
