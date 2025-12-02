@@ -53,8 +53,6 @@ namespace SteamRecUtility
         // Resolution and quality
         private ComboBox cmbResolution = null!;
         private ComboBox cmbEncoder = null!;
-        private NumericUpDown numCRF = null!;
-        private NumericUpDown numBitrate = null!;
         private CheckBox chkMoveProcessed = null!;
 
         // Processing option checkboxes
@@ -593,31 +591,6 @@ namespace SteamRecUtility
             settingsContainer.Controls.AddRange(new Control[] { lblResolution, cmbResolution });
             y += 35;
 
-            var lblCRF = new Label { Text = "CRF:", Location = new Point(10, y + 3), Width = labelWidth };
-            numCRF = new NumericUpDown
-            {
-                Location = new Point(10 + labelWidth, y),
-                Width = 60,
-                Minimum = 0,
-                Maximum = 51,
-                Value = 18
-            };
-
-            var lblBitrate = new Label { Text = "Bitrate:", Location = new Point(160, y + 3), Width = 50 };
-            numBitrate = new NumericUpDown
-            {
-                Location = new Point(215, y),
-                Width = 75,
-                Minimum = 1000,
-                Maximum = 100000,
-                Value = 20000,
-                Increment = 1000
-            };
-            var lblKbps = new Label { Text = "kbps", Location = new Point(292, y + 3), Width = 35 };
-
-            settingsContainer.Controls.AddRange(new Control[] { lblCRF, numCRF, lblBitrate, numBitrate, lblKbps });
-            y += 35;
-
             var lblEncoder = new Label { Text = "Encoder:", Location = new Point(10, y + 3), Width = labelWidth };
             cmbEncoder = new ComboBox
             {
@@ -625,11 +598,20 @@ namespace SteamRecUtility
                 Width = 200,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbEncoder.Items.AddRange(new[] { "H.265 CPU (Best Quality)", "H.265 NVENC (Fast)", "H.265 NVENC HQ (Recommended)" });
+            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU)" });
             cmbEncoder.SelectedIndex = 0;
 
-            settingsContainer.Controls.AddRange(new Control[] { lblEncoder, cmbEncoder });
-            y += 35;
+            var lblEncoderNote = new Label
+            {
+                Text = "Configure encoder quality in Settings",
+                Location = new Point(10, y + 28),
+                Width = 280,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+
+            settingsContainer.Controls.AddRange(new Control[] { lblEncoder, cmbEncoder, lblEncoderNote });
+            y += 50;
 
             chkMoveProcessed = new CheckBox
             {
@@ -795,9 +777,10 @@ namespace SteamRecUtility
             if (dlg.ShowDialog() == DialogResult.OK)
             {
                 // Reload settings that might have changed
-                numCRF.Value = settings.CRF;
-                numBitrate.Value = settings.Bitrate;
                 chkMoveProcessed.Checked = settings.MoveProcessedFiles;
+
+                // Update encoder dropdown to match settings
+                cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
 
                 // Update trackbar defaults for new videos
                 trackBrightness.Value = (int)(settings.Brightness * 100);
@@ -921,9 +904,7 @@ namespace SteamRecUtility
             btnApplyToAll.Enabled = colorEnabled;
             btnReset.Enabled = colorEnabled;
 
-            // Conversion quality controls
-            numCRF.Enabled = conversionEnabled;
-            numBitrate.Enabled = conversionEnabled;
+            // Conversion encoder control
             cmbEncoder.Enabled = conversionEnabled;
         }
 

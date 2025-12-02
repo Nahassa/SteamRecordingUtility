@@ -9,17 +9,10 @@ namespace SteamRecUtility
         {
             txtInputFolder.Text = settings.InputFolder;
             txtOutputFolder.Text = settings.OutputFolder;
-            numCRF.Value = settings.CRF;
-            numBitrate.Value = settings.Bitrate;
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
             // Encoder selection
-            cmbEncoder.SelectedIndex = settings.VideoEncoder switch
-            {
-                "hevc_nvenc" => 1,
-                "hevc_nvenc_hq" => 2,
-                _ => 0 // libx265 (default)
-            };
+            cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
 
             // Processing options
             chkEnableConversion.Checked = settings.EnableVideoConversion;
@@ -33,17 +26,10 @@ namespace SteamRecUtility
         {
             settings.InputFolder = txtInputFolder.Text;
             settings.OutputFolder = txtOutputFolder.Text;
-            settings.CRF = (int)numCRF.Value;
-            settings.Bitrate = (int)numBitrate.Value;
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
 
             // Encoder selection
-            settings.VideoEncoder = cmbEncoder.SelectedIndex switch
-            {
-                1 => "hevc_nvenc",
-                2 => "hevc_nvenc_hq",
-                _ => "libx265"
-            };
+            settings.VideoEncoder = cmbEncoder.SelectedIndex == 0 ? "libx265" : "hevc_nvenc";
 
             // Processing options
             settings.EnableVideoConversion = chkEnableConversion.Checked;
