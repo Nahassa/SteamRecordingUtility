@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 
-namespace VideoConverterApp
+namespace SteamRecUtility
 {
     public class FrameExtractor
     {

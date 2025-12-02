@@ -1,4 +1,4 @@
-namespace VideoConverterApp
+namespace SteamRecUtility
 {
     internal static class Program
     {

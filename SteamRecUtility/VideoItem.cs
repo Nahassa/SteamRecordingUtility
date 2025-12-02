@@ -1,4 +1,4 @@
-namespace VideoConverterApp
+namespace SteamRecUtility
 {
     public class VideoItem
     {

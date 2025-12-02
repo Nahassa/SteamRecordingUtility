@@ -1,6 +1,6 @@
-# VideoConverterApp
+# SteamRecUtility
 
-This folder contains the source code for the Steam Recording Video Converter application.
+This folder contains the source code for the Steam Recording Utility application.
 
 For full documentation, build instructions, and usage guide, see the [main README](../README.md).
 
@@ -13,8 +13,8 @@ For full documentation, build instructions, and usage guide, see the [main READM
 ## Building
 
 ```bash
-cd VideoConverterApp
+cd SteamRecUtility
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=true
 ```
 
-Executable will be at: `bin/Release/net8.0-windows/win-x64/publish/VideoConverterApp.exe`
+Executable will be at: `bin/Release/net8.0-windows/win-x64/publish/SteamRecUtility.exe`

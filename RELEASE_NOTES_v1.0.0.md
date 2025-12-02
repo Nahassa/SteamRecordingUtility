@@ -4,7 +4,7 @@ First official release of the Steam Recording Video Converter!
 
 ## What's Included
 
-### GUI Application (VideoConverterApp)
+### GUI Application (Steam Recording Utility)
 - **Portable x64 Windows executable** (build required - see instructions below)
 - User-friendly interface with folder selection
 - Configurable output resolution (1080p, 2K, 4K, or custom)
@@ -26,11 +26,11 @@ First official release of the Steam Recording Video Converter!
 To build the portable executable:
 
 ```bash
-cd VideoConverterApp
+cd SteamRecUtility
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=true
 ```
 
-The executable will be in: `bin/Release/net6.0-windows/win-x64/publish/VideoConverterApp.exe`
+The executable will be in: `bin/Release/net8.0-windows/win-x64/publish/SteamRecUtility.exe`
 
 ## Features
 

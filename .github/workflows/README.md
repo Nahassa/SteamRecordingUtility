@@ -4,7 +4,7 @@ This directory contains automated workflows for the Steam Recording Video Conver
 
 ## build-app.yml
 
-Automatically builds the VideoConverterApp executable for Windows x64.
+Automatically builds the Steam Recording Utility executable for Windows x64.
 
 ### When It Runs
 
@@ -13,10 +13,10 @@ The workflow triggers on:
 1. **Push to branches**:
    - `main` branch
    - Any `claude/**` branch
-   - Only when changes are made to `VideoConverterApp/` or the workflow file itself
+   - Only when changes are made to `SteamRecUtility/` or the workflow file itself
 
 2. **Pull requests**:
-   - When PRs modify `VideoConverterApp/`
+   - When PRs modify `SteamRecUtility/`
 
 3. **Releases**:
    - When a GitHub release is created or published
@@ -37,7 +37,7 @@ The workflow triggers on:
 5. **Gets version**:
    - From git tag if available (e.g., `v1.0.0` → `1.0.0`)
    - From commit SHA if no tag (first 7 characters)
-6. **Renames executable** with version: `VideoConverterApp-1.0.0-win-x64.exe`
+6. **Renames executable** with version: `SteamRecUtility-1.0.0-win-x64.exe`
 7. **Uploads as artifact**:
    - Available for download from the Actions run page
    - Retained for 30 days
@@ -50,7 +50,7 @@ The workflow triggers on:
 1. Go to the "Actions" tab in your repository
 2. Click on a workflow run
 3. Scroll down to "Artifacts"
-4. Download `VideoConverterApp-[version]`
+4. Download `SteamRecUtility-[version]`
 
 #### From Releases:
 - When you create a release, the executable is automatically attached as an asset
@@ -60,7 +60,7 @@ The workflow triggers on:
 To manually build the executable:
 
 1. Go to "Actions" tab
-2. Select "Build VideoConverterApp" workflow
+2. Select "Build SteamRec Utility" workflow
 3. Click "Run workflow"
 4. Select the branch
 5. Click "Run workflow" button

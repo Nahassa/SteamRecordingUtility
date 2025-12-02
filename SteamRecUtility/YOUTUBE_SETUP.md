@@ -1,18 +1,18 @@
 # YouTube Upload Setup Guide
 
-This guide explains how to set up YouTube upload functionality in the Steam Recording Video Converter.
+This guide explains how to set up YouTube upload functionality in the Steam Recording Utility.
 
 ## Prerequisites
 
 - Google Account
 - Access to Google Cloud Console
-- VideoConverterApp installed
+- Steam Recording Utility installed
 
 ## Step 1: Create a Google Cloud Project
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Click "Select a project" → "New Project"
-3. Enter a project name (e.g., "Video Converter")
+3. Enter a project name (e.g., "Steam Recording Utility")
 4. Click "Create"
 
 ## Step 2: Enable YouTube Data API v3
@@ -27,7 +27,7 @@ This guide explains how to set up YouTube upload functionality in the Steam Reco
 2. Click "Create Credentials" → "OAuth client ID"
 3. If prompted, configure the OAuth consent screen:
    - User Type: External
-   - App name: "Video Converter" (or your choice)
+   - App name: "Steam Recording Utility" (or your choice)
    - User support email: Your email
    - Developer contact: Your email
    - Click "Save and Continue"
@@ -36,26 +36,26 @@ This guide explains how to set up YouTube upload functionality in the Steam Reco
    - Click "Save and Continue"
 4. Back to "Create OAuth client ID":
    - Application type: "Desktop app"
-   - Name: "Video Converter Desktop"
+   - Name: "Steam Recording Utility Desktop"
    - Click "Create"
 5. Download the JSON file (click the download button)
 
 ## Step 4: Install the Credentials File
 
 1. Rename the downloaded JSON file to exactly: `youtube_credentials.json`
-2. Place it in the same folder as `VideoConverterApp.exe`
+2. Place it in the same folder as `SteamRecUtility.exe`
 
 Example location:
 ```
 C:\MyApp\
-├── VideoConverterApp.exe
+├── SteamRecUtility.exe
 ├── youtube_credentials.json  ← Place here
 └── settings.json
 ```
 
 ## Step 5: Authenticate in the App
 
-1. Launch VideoConverterApp.exe
+1. Launch SteamRecUtility.exe
 2. Check "Upload converted videos to YouTube"
 3. Click "Authenticate with YouTube"
 4. Your browser will open asking you to sign in with Google
@@ -92,7 +92,7 @@ Example:
 Gameplay recorded on {date}
 
 Original file: {filename_ext}
-Converted with Steam Recording Video Converter
+Converted with Steam Recording Utility
 ```
 
 ### Tags

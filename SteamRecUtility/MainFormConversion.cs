@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 
-namespace VideoConverterApp
+namespace SteamRecUtility
 {
     public partial class MainForm
     {
@@ -93,7 +93,15 @@ namespace VideoConverterApp
             }
 
             LogInfo($"Starting conversion of {videos.Count} video(s)");
-            LogInfo($"Global settings: CRF: {numCRF.Value}, Bitrate: {numBitrate.Value}k");
+            LogInfo($"Encoder: {settings.VideoEncoder}");
+            if (settings.VideoEncoder == "libx265")
+            {
+                LogInfo($"  libx265 settings - CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
+            }
+            else
+            {
+                LogInfo($"  hevc_nvenc settings - CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, RC: {settings.NvencRateControl}, Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}");
+            }
             LogInfo("");
 
             for (int i = 0; i < videos.Count; i++)
@@ -136,8 +144,8 @@ namespace VideoConverterApp
 
                     // Get effective encoder (with NVENC fallback if needed)
                     string encoder = GetEffectiveEncoder();
-                    string encoderArgs = GetEncoderArguments(encoder, (int)numCRF.Value, (int)numBitrate.Value);
-                    LogInfo($"  Encoder: {encoder}");
+                    string encoderArgs = GetEncoderArguments(encoder);
+                    LogInfo($"  Using encoder: {encoder}");
 
                     // Build FFmpeg command
                     string args;
@@ -181,8 +189,16 @@ namespace VideoConverterApp
                         lblCurrentTask.Text = fileName;
                         LogInfo("  Uploading to YouTube...");
 
-                        string title = youtubeUploader.ProcessTemplate(settings.YouTubeTitleTemplate, outputPath, settings.YouTubeRemoveDateFromFilename);
-                        string description = youtubeUploader.ProcessTemplate(settings.YouTubeDescriptionTemplate, outputPath, settings.YouTubeRemoveDateFromFilename);
+                        string title = youtubeUploader.ProcessTemplate(
+                            settings.YouTubeTitleTemplate,
+                            outputPath,
+                            settings.YouTubeRemoveDateFromFilename,
+                            settings.YouTubeRemoveTextPatterns);
+                        string description = youtubeUploader.ProcessTemplate(
+                            settings.YouTubeDescriptionTemplate,
+                            outputPath,
+                            settings.YouTubeRemoveDateFromFilename,
+                            settings.YouTubeRemoveTextPatterns);
                         string[] tags = settings.YouTubeTags.Split(',').Select(t => t.Trim()).ToArray();
 
                         var uploadProgress = new Progress<int>(percent =>
@@ -208,8 +224,8 @@ namespace VideoConverterApp
                         {
                             LogSuccess($"  Uploaded to YouTube: {videoUrl}");
 
-                            // Move converted video to uploaded subfolder
-                            string uploadedFolder = Path.Combine(processedFolder, "uploaded");
+                            // Move converted video to uploaded subfolder in output folder
+                            string uploadedFolder = Path.Combine(outputFolder, "uploaded");
                             if (!Directory.Exists(uploadedFolder))
                             {
                                 Directory.CreateDirectory(uploadedFolder);
@@ -453,14 +469,37 @@ namespace VideoConverterApp
             }
         }
 
-        private string GetEncoderArguments(string encoder, int crf, int bitrate)
+        private string GetEncoderArguments(string encoder)
         {
-            return encoder switch
+            if (encoder == "hevc_nvenc")
             {
-                "hevc_nvenc" => $"-c:v hevc_nvenc -preset p4 -cq {crf} -pix_fmt yuv420p -b:v {bitrate}k",
-                "hevc_nvenc_hq" => $"-c:v hevc_nvenc -preset p7 -tune hq -rc vbr -cq {crf} -spatial-aq 1 -temporal-aq 1 -rc-lookahead 32 -b_ref_mode middle -pix_fmt yuv420p -b:v {bitrate}k",
-                _ => $"-c:v libx265 -preset slow -pix_fmt yuv420p -crf {crf} -b:v {bitrate}k" // libx265 (default)
-            };
+                // hevc_nvenc (GPU) encoder settings - single-pass only
+                var args = $"-c:v hevc_nvenc -preset {settings.NvencPreset} -rc {settings.NvencRateControl}";
+
+                // CQ level (quality parameter)
+                args += $" -cq {settings.NvencCQ}";
+
+                // Adaptive quantization
+                if (settings.NvencSpatialAQ)
+                    args += " -spatial-aq 1";
+                if (settings.NvencTemporalAQ)
+                    args += " -temporal-aq 1";
+
+                args += " -pix_fmt yuv420p";
+                return args;
+            }
+            else
+            {
+                // libx265 (CPU) encoder settings - single-pass only
+                var args = $"-c:v libx265 -crf {settings.X265CRF} -preset {settings.X265Preset}";
+
+                // Add tune if specified
+                if (!string.IsNullOrEmpty(settings.X265Tune))
+                    args += $" -tune {settings.X265Tune}";
+
+                args += " -pix_fmt yuv420p";
+                return args;
+            }
         }
 
         private string GetEffectiveEncoder()
@@ -468,7 +507,7 @@ namespace VideoConverterApp
             string requestedEncoder = settings.VideoEncoder;
 
             // If NVENC requested but not available, fall back to libx265
-            if ((requestedEncoder == "hevc_nvenc" || requestedEncoder == "hevc_nvenc_hq") && !IsNvencAvailable())
+            if (requestedEncoder == "hevc_nvenc" && !IsNvencAvailable())
             {
                 LogWarning("NVENC encoder not available. Falling back to CPU encoder (libx265).");
                 return "libx265";

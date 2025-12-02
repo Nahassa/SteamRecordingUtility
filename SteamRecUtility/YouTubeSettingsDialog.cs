@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Forms;
 
-namespace VideoConverterApp
+namespace SteamRecUtility
 {
     public class YouTubeSettingsDialog : Form
     {
@@ -17,6 +17,7 @@ namespace VideoConverterApp
         private CheckBox chkMadeForKids = null!;
         private CheckBox chkAgeRestricted = null!;
         private CheckBox chkRemoveDateFromFilename = null!;
+        private TextBox txtRemoveTextPatterns = null!;
         private Button btnAuth = null!;
         private Label lblStatus = null!;
         private Button btnOK = null!;
@@ -50,7 +51,7 @@ namespace VideoConverterApp
         private void InitializeComponent()
         {
             this.Text = "YouTube Upload Settings";
-            this.Size = new Size(600, 620);
+            this.Size = new Size(600, 680);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -192,6 +193,31 @@ namespace VideoConverterApp
             };
             this.Controls.AddRange(new Control[] { lblFilenameOptions, chkRemoveDateFromFilename });
 
+            y += 30;
+
+            // Remove text patterns
+            var lblRemoveText = new Label { Text = "", Location = new Point(15, y + 3), Width = labelWidth };
+            txtRemoveTextPatterns = new TextBox
+            {
+                Location = new Point(145, y),
+                Width = controlWidth,
+                Text = settings.YouTubeRemoveTextPatterns,
+                PlaceholderText = "e.g., recording, test, 2024-"
+            };
+            this.Controls.AddRange(new Control[] { lblRemoveText, txtRemoveTextPatterns });
+
+            y += 25;
+
+            var lblRemoveTextHelp = new Label
+            {
+                Text = "Remove specific text (comma-separated). Applied after date removal.",
+                Location = new Point(145, y),
+                Width = controlWidth,
+                ForeColor = Color.Gray,
+                Font = new Font(this.Font.FontFamily, 8)
+            };
+            this.Controls.Add(lblRemoveTextHelp);
+
             y += 35;
 
             // Authentication
@@ -277,6 +303,7 @@ namespace VideoConverterApp
             chkMadeForKids.Enabled = enabled;
             chkAgeRestricted.Enabled = enabled;
             chkRemoveDateFromFilename.Enabled = enabled;
+            txtRemoveTextPatterns.Enabled = enabled;
             btnAuth.Enabled = enabled;
         }
 
@@ -335,6 +362,7 @@ namespace VideoConverterApp
             settings.YouTubeMadeForKids = chkMadeForKids.Checked;
             settings.YouTubeAgeRestricted = chkAgeRestricted.Checked;
             settings.YouTubeRemoveDateFromFilename = chkRemoveDateFromFilename.Checked;
+            settings.YouTubeRemoveTextPatterns = txtRemoveTextPatterns.Text;
 
             settings.Save();
         }
