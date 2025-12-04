@@ -598,7 +598,7 @@ namespace SteamRecUtility
                 Width = 200,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU)" });
+            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU HEVC)", "av1_nvenc (GPU AV1)" });
             cmbEncoder.SelectedIndex = 0;
 
             var lblEncoderNote = new Label
@@ -780,7 +780,13 @@ namespace SteamRecUtility
                 chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
                 // Update encoder dropdown to match settings
-                cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
+                cmbEncoder.SelectedIndex = settings.VideoEncoder switch
+                {
+                    "libx265" => 0,
+                    "hevc_nvenc" => 1,
+                    "av1_nvenc" => 2,
+                    _ => 0
+                };
 
                 // Update trackbar defaults for new videos
                 trackBrightness.Value = (int)(settings.Brightness * 100);

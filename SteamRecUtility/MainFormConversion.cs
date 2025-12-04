@@ -96,11 +96,19 @@ namespace SteamRecUtility
             LogInfo($"Encoder: {settings.VideoEncoder}");
             if (settings.VideoEncoder == "libx265")
             {
-                LogInfo($"  libx265 settings - CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
+                LogInfo($"  CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
+                LogInfo($"  B-Frames: {settings.X265BFrames}, Lookahead: {settings.X265Lookahead}, Bit Depth: {settings.X265BitDepth}");
             }
-            else
+            else if (settings.VideoEncoder == "hevc_nvenc")
             {
-                LogInfo($"  hevc_nvenc settings - CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, RC: {settings.NvencRateControl}, Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}");
+                LogInfo($"  CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, RC: {settings.NvencRateControl}");
+                LogInfo($"  B-Frames: {settings.NvencBFrames}, Lookahead: {settings.NvencLookahead}, Multipass: {settings.NvencMultipass}");
+                LogInfo($"  Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}, Bit Depth: {settings.NvencBitDepth}");
+            }
+            else if (settings.VideoEncoder == "av1_nvenc")
+            {
+                LogInfo($"  CQ: {settings.Av1CQ}, Preset: {settings.Av1Preset}, RC: {settings.Av1RateControl}");
+                LogInfo($"  Lookahead: {settings.Av1Lookahead}, Multipass: {settings.Av1Multipass}");
             }
             LogInfo("");
 
@@ -429,13 +437,13 @@ namespace SteamRecUtility
             }
         }
 
-        private bool? _nvencAvailable = null;
+        private string? _encoderListCache = null;
 
-        private bool IsNvencAvailable()
+        private string GetEncoderList()
         {
-            // Cache the result to avoid repeated checks
-            if (_nvencAvailable.HasValue)
-                return _nvencAvailable.Value;
+            // Cache the encoder list to avoid repeated checks
+            if (_encoderListCache != null)
+                return _encoderListCache;
 
             try
             {
@@ -452,32 +460,48 @@ namespace SteamRecUtility
                 using Process? process = Process.Start(psi);
                 if (process == null)
                 {
-                    _nvencAvailable = false;
-                    return false;
+                    _encoderListCache = "";
+                    return "";
                 }
 
-                string output = process.StandardOutput.ReadToEnd();
+                _encoderListCache = process.StandardOutput.ReadToEnd();
                 process.WaitForExit();
 
-                _nvencAvailable = output.Contains("hevc_nvenc");
-                return _nvencAvailable.Value;
+                return _encoderListCache;
             }
             catch
             {
-                _nvencAvailable = false;
-                return false;
+                _encoderListCache = "";
+                return "";
             }
+        }
+
+        private bool IsEncoderAvailable(string encoderName)
+        {
+            return GetEncoderList().Contains(encoderName);
         }
 
         private string GetEncoderArguments(string encoder)
         {
             if (encoder == "hevc_nvenc")
             {
-                // hevc_nvenc (GPU) encoder settings - single-pass only
+                // hevc_nvenc (GPU HEVC) encoder settings
                 var args = $"-c:v hevc_nvenc -preset {settings.NvencPreset} -rc {settings.NvencRateControl}";
 
                 // CQ level (quality parameter)
                 args += $" -cq {settings.NvencCQ}";
+
+                // B-frames
+                if (settings.NvencBFrames > 0)
+                    args += $" -bf {settings.NvencBFrames}";
+
+                // Lookahead
+                if (settings.NvencLookahead > 0)
+                    args += $" -rc-lookahead {settings.NvencLookahead}";
+
+                // Multipass
+                if (settings.NvencMultipass != "disabled")
+                    args += $" -multipass {settings.NvencMultipass}";
 
                 // Adaptive quantization
                 if (settings.NvencSpatialAQ)
@@ -485,19 +509,47 @@ namespace SteamRecUtility
                 if (settings.NvencTemporalAQ)
                     args += " -temporal-aq 1";
 
+                // Bit depth
+                args += settings.NvencBitDepth == 10 ? " -pix_fmt p010le" : " -pix_fmt yuv420p";
+                return args;
+            }
+            else if (encoder == "av1_nvenc")
+            {
+                // av1_nvenc (GPU AV1) encoder settings - RTX 40/50 series
+                var args = $"-c:v av1_nvenc -preset {settings.Av1Preset} -rc {settings.Av1RateControl}";
+
+                // CQ level (quality parameter)
+                args += $" -cq {settings.Av1CQ}";
+
+                // Lookahead
+                if (settings.Av1Lookahead > 0)
+                    args += $" -rc-lookahead {settings.Av1Lookahead}";
+
+                // Multipass
+                if (settings.Av1Multipass != "disabled")
+                    args += $" -multipass {settings.Av1Multipass}";
+
                 args += " -pix_fmt yuv420p";
                 return args;
             }
             else
             {
-                // libx265 (CPU) encoder settings - single-pass only
+                // libx265 (CPU) encoder settings
                 var args = $"-c:v libx265 -crf {settings.X265CRF} -preset {settings.X265Preset}";
 
                 // Add tune if specified
                 if (!string.IsNullOrEmpty(settings.X265Tune))
                     args += $" -tune {settings.X265Tune}";
 
-                args += " -pix_fmt yuv420p";
+                // B-frames
+                args += $" -x265-params bframes={settings.X265BFrames}";
+
+                // Lookahead
+                if (settings.X265Lookahead > 0)
+                    args += $":rc-lookahead={settings.X265Lookahead}";
+
+                // Bit depth
+                args += settings.X265BitDepth == 10 ? " -pix_fmt yuv420p10le" : " -pix_fmt yuv420p";
                 return args;
             }
         }
@@ -506,10 +558,23 @@ namespace SteamRecUtility
         {
             string requestedEncoder = settings.VideoEncoder;
 
-            // If NVENC requested but not available, fall back to libx265
-            if (requestedEncoder == "hevc_nvenc" && !IsNvencAvailable())
+            // If GPU encoder requested but not available, try fallback options
+            if (requestedEncoder == "av1_nvenc" && !IsEncoderAvailable("av1_nvenc"))
             {
-                LogWarning("NVENC encoder not available. Falling back to CPU encoder (libx265).");
+                LogWarning("AV1 NVENC encoder not available (requires RTX 40/50 series).");
+                // Try falling back to HEVC NVENC
+                if (IsEncoderAvailable("hevc_nvenc"))
+                {
+                    LogWarning("Falling back to HEVC NVENC encoder.");
+                    return "hevc_nvenc";
+                }
+                LogWarning("Falling back to CPU encoder (libx265).");
+                return "libx265";
+            }
+
+            if (requestedEncoder == "hevc_nvenc" && !IsEncoderAvailable("hevc_nvenc"))
+            {
+                LogWarning("HEVC NVENC encoder not available. Falling back to CPU encoder (libx265).");
                 return "libx265";
             }
 

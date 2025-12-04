@@ -28,6 +28,9 @@ namespace SteamRecUtility
         private NumericUpDown numX265CRF = null!;
         private ComboBox cmbX265Preset = null!;
         private ComboBox cmbX265Tune = null!;
+        private NumericUpDown numX265BFrames = null!;
+        private NumericUpDown numX265Lookahead = null!;
+        private ComboBox cmbX265BitDepth = null!;
 
         // hevc_nvenc controls
         private Panel pnlNvencSettings = null!;
@@ -36,6 +39,18 @@ namespace SteamRecUtility
         private ComboBox cmbNvencRateControl = null!;
         private CheckBox chkNvencSpatialAQ = null!;
         private CheckBox chkNvencTemporalAQ = null!;
+        private NumericUpDown numNvencBFrames = null!;
+        private NumericUpDown numNvencLookahead = null!;
+        private ComboBox cmbNvencMultipass = null!;
+        private ComboBox cmbNvencBitDepth = null!;
+
+        // av1_nvenc controls
+        private Panel pnlAv1Settings = null!;
+        private NumericUpDown numAv1CQ = null!;
+        private ComboBox cmbAv1Preset = null!;
+        private ComboBox cmbAv1RateControl = null!;
+        private ComboBox cmbAv1Multipass = null!;
+        private NumericUpDown numAv1Lookahead = null!;
 
         // Other settings
         private CheckBox chkMoveProcessed = null!;
@@ -54,7 +69,7 @@ namespace SteamRecUtility
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(500, 620);
+            this.Size = new Size(500, 720);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -151,7 +166,7 @@ namespace SteamRecUtility
             {
                 Text = "Default Output Settings",
                 Location = new Point(10, y),
-                Size = new Size(465, 320)
+                Size = new Size(465, 420)
             };
             this.Controls.Add(grpOutput);
 
@@ -200,7 +215,7 @@ namespace SteamRecUtility
                 Width = 150,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU)" });
+            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU HEVC)", "av1_nvenc (GPU AV1)" });
             cmbEncoder.SelectedIndexChanged += CmbEncoder_SelectedIndexChanged;
             grpOutput.Controls.AddRange(new Control[] { lblEncoder, cmbEncoder });
             gy += 35;
@@ -209,7 +224,7 @@ namespace SteamRecUtility
             pnlX265Settings = new Panel
             {
                 Location = new Point(10, gy),
-                Size = new Size(445, 170),
+                Size = new Size(445, 240),
                 Visible = false
             };
             grpOutput.Controls.Add(pnlX265Settings);
@@ -228,15 +243,14 @@ namespace SteamRecUtility
             };
             var lblX265CRFHelp = new Label
             {
-                Text = "Lower = better quality, larger file. 18-28 recommended.",
-                Location = new Point(controlLeft - 10, x265y + 25),
-                Width = 300,
-                Height = 30,
+                Text = "Lower = better quality. 18-28 recommended.",
+                Location = new Point(controlLeft + 55, x265y + 3),
+                Width = 250,
                 ForeColor = System.Drawing.Color.Gray,
                 Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
             };
             pnlX265Settings.Controls.AddRange(new Control[] { lblX265CRF, numX265CRF, lblX265CRFHelp });
-            x265y += 55;
+            x265y += 28;
 
             // Preset
             var lblX265Preset = new Label { Text = "Preset:", Location = new Point(5, x265y + 3), Width = labelWidth };
@@ -249,15 +263,14 @@ namespace SteamRecUtility
             cmbX265Preset.Items.AddRange(new[] { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" });
             var lblX265PresetHelp = new Label
             {
-                Text = "Slower = better compression. medium recommended.",
-                Location = new Point(controlLeft - 10, x265y + 25),
-                Width = 300,
-                Height = 30,
+                Text = "Slower = better compression.",
+                Location = new Point(controlLeft + 115, x265y + 3),
+                Width = 200,
                 ForeColor = System.Drawing.Color.Gray,
                 Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
             };
             pnlX265Settings.Controls.AddRange(new Control[] { lblX265Preset, cmbX265Preset, lblX265PresetHelp });
-            x265y += 55;
+            x265y += 28;
 
             // Tune
             var lblX265Tune = new Label { Text = "Tune:", Location = new Point(5, x265y + 3), Width = labelWidth };
@@ -270,20 +283,81 @@ namespace SteamRecUtility
             cmbX265Tune.Items.AddRange(new[] { "(none)", "film", "animation", "grain", "fastdecode", "zerolatency" });
             var lblX265TuneHelp = new Label
             {
-                Text = "Optional tuning for specific content types.",
-                Location = new Point(controlLeft - 10, x265y + 25),
-                Width = 300,
-                Height = 30,
+                Text = "Content-specific tuning.",
+                Location = new Point(controlLeft + 115, x265y + 3),
+                Width = 200,
                 ForeColor = System.Drawing.Color.Gray,
                 Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
             };
             pnlX265Settings.Controls.AddRange(new Control[] { lblX265Tune, cmbX265Tune, lblX265TuneHelp });
+            x265y += 28;
+
+            // B-Frames
+            var lblX265BFrames = new Label { Text = "B-Frames (0-16):", Location = new Point(5, x265y + 3), Width = labelWidth };
+            numX265BFrames = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, x265y),
+                Width = 60,
+                Minimum = 0,
+                Maximum = 16,
+                Value = 3
+            };
+            var lblX265BFramesHelp = new Label
+            {
+                Text = "More = better compression, slower.",
+                Location = new Point(controlLeft + 55, x265y + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlX265Settings.Controls.AddRange(new Control[] { lblX265BFrames, numX265BFrames, lblX265BFramesHelp });
+            x265y += 28;
+
+            // Lookahead
+            var lblX265Lookahead = new Label { Text = "Lookahead (0-250):", Location = new Point(5, x265y + 3), Width = labelWidth };
+            numX265Lookahead = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, x265y),
+                Width = 60,
+                Minimum = 0,
+                Maximum = 250,
+                Value = 0
+            };
+            var lblX265LookaheadHelp = new Label
+            {
+                Text = "0 = disabled. Higher = better quality.",
+                Location = new Point(controlLeft + 55, x265y + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlX265Settings.Controls.AddRange(new Control[] { lblX265Lookahead, numX265Lookahead, lblX265LookaheadHelp });
+            x265y += 28;
+
+            // Bit Depth
+            var lblX265BitDepth = new Label { Text = "Bit Depth:", Location = new Point(5, x265y + 3), Width = labelWidth };
+            cmbX265BitDepth = new ComboBox
+            {
+                Location = new Point(controlLeft - 10, x265y),
+                Width = 80,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbX265BitDepth.Items.AddRange(new[] { "8-bit", "10-bit" });
+            var lblX265BitDepthHelp = new Label
+            {
+                Text = "10-bit = better gradients, larger files.",
+                Location = new Point(controlLeft + 75, x265y + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlX265Settings.Controls.AddRange(new Control[] { lblX265BitDepth, cmbX265BitDepth, lblX265BitDepthHelp });
 
             // === hevc_nvenc Settings Panel ===
             pnlNvencSettings = new Panel
             {
                 Location = new Point(10, gy),
-                Size = new Size(445, 170),
+                Size = new Size(445, 280),
                 Visible = false
             };
             grpOutput.Controls.Add(pnlNvencSettings);
@@ -303,67 +377,264 @@ namespace SteamRecUtility
             var lblNvencCQHelp = new Label
             {
                 Text = "Lower = better quality. 19-23 recommended.",
-                Location = new Point(controlLeft - 10, nvency + 25),
-                Width = 300,
-                Height = 30,
+                Location = new Point(controlLeft + 55, nvency + 3),
+                Width = 250,
                 ForeColor = System.Drawing.Color.Gray,
                 Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
             };
             pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencCQ, numNvencCQ, lblNvencCQHelp });
-            nvency += 55;
+            nvency += 28;
 
-            // Preset
+            // Preset (modern p1-p7 naming)
             var lblNvencPreset = new Label { Text = "Preset:", Location = new Point(5, nvency + 3), Width = labelWidth };
             cmbNvencPreset = new ComboBox
             {
                 Location = new Point(controlLeft - 10, nvency),
-                Width = 120,
+                Width = 80,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbNvencPreset.Items.AddRange(new[] { "default", "slow", "medium", "fast", "hp", "hq", "bd", "ll", "llhq", "llhp", "lossless" });
-            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencPreset, cmbNvencPreset });
-            nvency += 30;
+            cmbNvencPreset.Items.AddRange(new[] { "p1", "p2", "p3", "p4", "p5", "p6", "p7" });
+            var lblNvencPresetHelp = new Label
+            {
+                Text = "p1=fastest, p7=best quality. p5 recommended.",
+                Location = new Point(controlLeft + 75, nvency + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencPreset, cmbNvencPreset, lblNvencPresetHelp });
+            nvency += 28;
 
             // Rate Control
             var lblNvencRC = new Label { Text = "Rate Control:", Location = new Point(5, nvency + 3), Width = labelWidth };
             cmbNvencRateControl = new ComboBox
             {
                 Location = new Point(controlLeft - 10, nvency),
-                Width = 120,
+                Width = 100,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbNvencRateControl.Items.AddRange(new[] { "constqp", "vbr", "cbr" });
             var lblNvencRCHelp = new Label
             {
-                Text = "constqp = constant quality (recommended)",
-                Location = new Point(controlLeft - 10, nvency + 25),
-                Width = 300,
-                Height = 30,
+                Text = "constqp = constant quality.",
+                Location = new Point(controlLeft + 95, nvency + 3),
+                Width = 200,
                 ForeColor = System.Drawing.Color.Gray,
                 Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
             };
             pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencRC, cmbNvencRateControl, lblNvencRCHelp });
-            nvency += 55;
+            nvency += 28;
+
+            // B-Frames
+            var lblNvencBFrames = new Label { Text = "B-Frames (0-4):", Location = new Point(5, nvency + 3), Width = labelWidth };
+            numNvencBFrames = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, nvency),
+                Width = 60,
+                Minimum = 0,
+                Maximum = 4,
+                Value = 0
+            };
+            var lblNvencBFramesHelp = new Label
+            {
+                Text = "0 = disabled. Higher = better compression.",
+                Location = new Point(controlLeft + 55, nvency + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencBFrames, numNvencBFrames, lblNvencBFramesHelp });
+            nvency += 28;
+
+            // Lookahead
+            var lblNvencLookahead = new Label { Text = "Lookahead (0-32):", Location = new Point(5, nvency + 3), Width = labelWidth };
+            numNvencLookahead = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, nvency),
+                Width = 60,
+                Minimum = 0,
+                Maximum = 32,
+                Value = 0
+            };
+            var lblNvencLookaheadHelp = new Label
+            {
+                Text = "0 = disabled. Higher = better quality.",
+                Location = new Point(controlLeft + 55, nvency + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencLookahead, numNvencLookahead, lblNvencLookaheadHelp });
+            nvency += 28;
+
+            // Multipass
+            var lblNvencMultipass = new Label { Text = "Multipass:", Location = new Point(5, nvency + 3), Width = labelWidth };
+            cmbNvencMultipass = new ComboBox
+            {
+                Location = new Point(controlLeft - 10, nvency),
+                Width = 100,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbNvencMultipass.Items.AddRange(new[] { "disabled", "qres", "fullres" });
+            var lblNvencMultipassHelp = new Label
+            {
+                Text = "fullres = best quality, slower.",
+                Location = new Point(controlLeft + 95, nvency + 3),
+                Width = 200,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencMultipass, cmbNvencMultipass, lblNvencMultipassHelp });
+            nvency += 28;
+
+            // Bit Depth
+            var lblNvencBitDepth = new Label { Text = "Bit Depth:", Location = new Point(5, nvency + 3), Width = labelWidth };
+            cmbNvencBitDepth = new ComboBox
+            {
+                Location = new Point(controlLeft - 10, nvency),
+                Width = 80,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbNvencBitDepth.Items.AddRange(new[] { "8-bit", "10-bit" });
+            var lblNvencBitDepthHelp = new Label
+            {
+                Text = "10-bit = better gradients.",
+                Location = new Point(controlLeft + 75, nvency + 3),
+                Width = 200,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencBitDepth, cmbNvencBitDepth, lblNvencBitDepthHelp });
+            nvency += 28;
 
             // Adaptive Quantization checkboxes
             chkNvencSpatialAQ = new CheckBox
             {
                 Text = "Spatial AQ (improves quality)",
                 Location = new Point(controlLeft - 10, nvency),
-                Width = 250,
+                Width = 200,
                 Checked = true
             };
-            pnlNvencSettings.Controls.Add(chkNvencSpatialAQ);
-            nvency += 25;
-
             chkNvencTemporalAQ = new CheckBox
             {
-                Text = "Temporal AQ (improves motion quality)",
-                Location = new Point(controlLeft - 10, nvency),
-                Width = 250,
+                Text = "Temporal AQ (motion)",
+                Location = new Point(controlLeft + 195, nvency),
+                Width = 180,
                 Checked = true
             };
-            pnlNvencSettings.Controls.Add(chkNvencTemporalAQ);
+            pnlNvencSettings.Controls.AddRange(new Control[] { chkNvencSpatialAQ, chkNvencTemporalAQ });
+
+            // === av1_nvenc Settings Panel ===
+            pnlAv1Settings = new Panel
+            {
+                Location = new Point(10, gy),
+                Size = new Size(445, 170),
+                Visible = false
+            };
+            grpOutput.Controls.Add(pnlAv1Settings);
+
+            int av1y = 0;
+
+            // CQ
+            var lblAv1CQ = new Label { Text = "CQ Level (0-51):", Location = new Point(5, av1y + 3), Width = labelWidth };
+            numAv1CQ = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, av1y),
+                Width = 60,
+                Minimum = 0,
+                Maximum = 51,
+                Value = 23
+            };
+            var lblAv1CQHelp = new Label
+            {
+                Text = "Lower = better quality. 19-26 recommended.",
+                Location = new Point(controlLeft + 55, av1y + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlAv1Settings.Controls.AddRange(new Control[] { lblAv1CQ, numAv1CQ, lblAv1CQHelp });
+            av1y += 28;
+
+            // Preset (p1-p7)
+            var lblAv1Preset = new Label { Text = "Preset:", Location = new Point(5, av1y + 3), Width = labelWidth };
+            cmbAv1Preset = new ComboBox
+            {
+                Location = new Point(controlLeft - 10, av1y),
+                Width = 80,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbAv1Preset.Items.AddRange(new[] { "p1", "p2", "p3", "p4", "p5", "p6", "p7" });
+            var lblAv1PresetHelp = new Label
+            {
+                Text = "p1=fastest, p7=best quality. p5 recommended.",
+                Location = new Point(controlLeft + 75, av1y + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlAv1Settings.Controls.AddRange(new Control[] { lblAv1Preset, cmbAv1Preset, lblAv1PresetHelp });
+            av1y += 28;
+
+            // Rate Control
+            var lblAv1RC = new Label { Text = "Rate Control:", Location = new Point(5, av1y + 3), Width = labelWidth };
+            cmbAv1RateControl = new ComboBox
+            {
+                Location = new Point(controlLeft - 10, av1y),
+                Width = 100,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbAv1RateControl.Items.AddRange(new[] { "constqp", "vbr", "cbr" });
+            var lblAv1RCHelp = new Label
+            {
+                Text = "constqp = constant quality.",
+                Location = new Point(controlLeft + 95, av1y + 3),
+                Width = 200,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlAv1Settings.Controls.AddRange(new Control[] { lblAv1RC, cmbAv1RateControl, lblAv1RCHelp });
+            av1y += 28;
+
+            // Multipass
+            var lblAv1Multipass = new Label { Text = "Multipass:", Location = new Point(5, av1y + 3), Width = labelWidth };
+            cmbAv1Multipass = new ComboBox
+            {
+                Location = new Point(controlLeft - 10, av1y),
+                Width = 100,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbAv1Multipass.Items.AddRange(new[] { "disabled", "qres", "fullres" });
+            var lblAv1MultipassHelp = new Label
+            {
+                Text = "fullres = best quality, slower.",
+                Location = new Point(controlLeft + 95, av1y + 3),
+                Width = 200,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlAv1Settings.Controls.AddRange(new Control[] { lblAv1Multipass, cmbAv1Multipass, lblAv1MultipassHelp });
+            av1y += 28;
+
+            // Lookahead
+            var lblAv1Lookahead = new Label { Text = "Lookahead (0-32):", Location = new Point(5, av1y + 3), Width = labelWidth };
+            numAv1Lookahead = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, av1y),
+                Width = 60,
+                Minimum = 0,
+                Maximum = 32,
+                Value = 0
+            };
+            var lblAv1LookaheadHelp = new Label
+            {
+                Text = "0 = disabled. Higher = better quality.",
+                Location = new Point(controlLeft + 55, av1y + 3),
+                Width = 250,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            pnlAv1Settings.Controls.AddRange(new Control[] { lblAv1Lookahead, numAv1Lookahead, lblAv1LookaheadHelp });
 
             y += grpOutput.Height + 15;
 
@@ -444,12 +715,21 @@ namespace SteamRecUtility
             UpdateCustomResolutionEnabled();
 
             // Encoder
-            cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
+            cmbEncoder.SelectedIndex = settings.VideoEncoder switch
+            {
+                "libx265" => 0,
+                "hevc_nvenc" => 1,
+                "av1_nvenc" => 2,
+                _ => 0
+            };
 
             // libx265 settings
             numX265CRF.Value = settings.X265CRF;
             cmbX265Preset.SelectedItem = settings.X265Preset;
             cmbX265Tune.SelectedItem = string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune;
+            numX265BFrames.Value = settings.X265BFrames;
+            numX265Lookahead.Value = settings.X265Lookahead;
+            cmbX265BitDepth.SelectedIndex = settings.X265BitDepth == 10 ? 1 : 0;
 
             // hevc_nvenc settings
             numNvencCQ.Value = settings.NvencCQ;
@@ -457,6 +737,17 @@ namespace SteamRecUtility
             cmbNvencRateControl.SelectedItem = settings.NvencRateControl;
             chkNvencSpatialAQ.Checked = settings.NvencSpatialAQ;
             chkNvencTemporalAQ.Checked = settings.NvencTemporalAQ;
+            numNvencBFrames.Value = settings.NvencBFrames;
+            numNvencLookahead.Value = settings.NvencLookahead;
+            cmbNvencMultipass.SelectedItem = settings.NvencMultipass;
+            cmbNvencBitDepth.SelectedIndex = settings.NvencBitDepth == 10 ? 1 : 0;
+
+            // av1_nvenc settings
+            numAv1CQ.Value = settings.Av1CQ;
+            cmbAv1Preset.SelectedItem = settings.Av1Preset;
+            cmbAv1RateControl.SelectedItem = settings.Av1RateControl;
+            cmbAv1Multipass.SelectedItem = settings.Av1Multipass;
+            numAv1Lookahead.Value = settings.Av1Lookahead;
 
             UpdateEncoderPanels();
 
@@ -480,9 +771,10 @@ namespace SteamRecUtility
 
         private void UpdateEncoderPanels()
         {
-            bool isX265 = cmbEncoder.SelectedIndex == 0;
-            pnlX265Settings.Visible = isX265;
-            pnlNvencSettings.Visible = !isX265;
+            int selectedIndex = cmbEncoder.SelectedIndex;
+            pnlX265Settings.Visible = selectedIndex == 0;
+            pnlNvencSettings.Visible = selectedIndex == 1;
+            pnlAv1Settings.Visible = selectedIndex == 2;
         }
 
         private void TrackDefaultBrightness_ValueChanged(object? sender, EventArgs e)
@@ -546,13 +838,27 @@ namespace SteamRecUtility
                 numX265CRF.Value = 23;
                 cmbX265Preset.SelectedItem = "medium";
                 cmbX265Tune.SelectedItem = "(none)";
+                numX265BFrames.Value = 3;
+                numX265Lookahead.Value = 0;
+                cmbX265BitDepth.SelectedIndex = 0; // 8-bit
 
                 // hevc_nvenc defaults
                 numNvencCQ.Value = 21;
-                cmbNvencPreset.SelectedItem = "hq";
+                cmbNvencPreset.SelectedItem = "p5";
                 cmbNvencRateControl.SelectedItem = "constqp";
                 chkNvencSpatialAQ.Checked = true;
                 chkNvencTemporalAQ.Checked = true;
+                numNvencBFrames.Value = 0;
+                numNvencLookahead.Value = 0;
+                cmbNvencMultipass.SelectedItem = "disabled";
+                cmbNvencBitDepth.SelectedIndex = 0; // 8-bit
+
+                // av1_nvenc defaults
+                numAv1CQ.Value = 23;
+                cmbAv1Preset.SelectedItem = "p5";
+                cmbAv1RateControl.SelectedItem = "constqp";
+                cmbAv1Multipass.SelectedItem = "disabled";
+                numAv1Lookahead.Value = 0;
 
                 chkMoveProcessed.Checked = true;
                 UpdateAdjustmentLabels();
@@ -570,19 +876,39 @@ namespace SteamRecUtility
             settings.OutputHeight = (int)numCustomHeight.Value;
 
             // Encoder
-            settings.VideoEncoder = cmbEncoder.SelectedIndex == 0 ? "libx265" : "hevc_nvenc";
+            settings.VideoEncoder = cmbEncoder.SelectedIndex switch
+            {
+                0 => "libx265",
+                1 => "hevc_nvenc",
+                2 => "av1_nvenc",
+                _ => "libx265"
+            };
 
             // libx265 settings
             settings.X265CRF = (int)numX265CRF.Value;
             settings.X265Preset = cmbX265Preset.SelectedItem?.ToString() ?? "medium";
             settings.X265Tune = cmbX265Tune.SelectedItem?.ToString() == "(none)" ? "" : cmbX265Tune.SelectedItem?.ToString() ?? "";
+            settings.X265BFrames = (int)numX265BFrames.Value;
+            settings.X265Lookahead = (int)numX265Lookahead.Value;
+            settings.X265BitDepth = cmbX265BitDepth.SelectedIndex == 1 ? 10 : 8;
 
             // hevc_nvenc settings
             settings.NvencCQ = (int)numNvencCQ.Value;
-            settings.NvencPreset = cmbNvencPreset.SelectedItem?.ToString() ?? "hq";
+            settings.NvencPreset = cmbNvencPreset.SelectedItem?.ToString() ?? "p5";
             settings.NvencRateControl = cmbNvencRateControl.SelectedItem?.ToString() ?? "constqp";
             settings.NvencSpatialAQ = chkNvencSpatialAQ.Checked;
             settings.NvencTemporalAQ = chkNvencTemporalAQ.Checked;
+            settings.NvencBFrames = (int)numNvencBFrames.Value;
+            settings.NvencLookahead = (int)numNvencLookahead.Value;
+            settings.NvencMultipass = cmbNvencMultipass.SelectedItem?.ToString() ?? "disabled";
+            settings.NvencBitDepth = cmbNvencBitDepth.SelectedIndex == 1 ? 10 : 8;
+
+            // av1_nvenc settings
+            settings.Av1CQ = (int)numAv1CQ.Value;
+            settings.Av1Preset = cmbAv1Preset.SelectedItem?.ToString() ?? "p5";
+            settings.Av1RateControl = cmbAv1RateControl.SelectedItem?.ToString() ?? "constqp";
+            settings.Av1Multipass = cmbAv1Multipass.SelectedItem?.ToString() ?? "disabled";
+            settings.Av1Lookahead = (int)numAv1Lookahead.Value;
 
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
 
