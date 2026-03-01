@@ -12,7 +12,16 @@ namespace SteamRecUtility
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
             // Encoder selection
-            cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
+            cmbEncoder.SelectedIndex = settings.VideoEncoder switch
+            {
+                "libx265" => 0,
+                "hevc_nvenc" => 1,
+                "av1_nvenc" => 2,
+                _ => 1
+            };
+
+            // Scaling mode
+            cmbScalingMode.SelectedIndex = settings.ScalingMode == "sar" ? 0 : 1;
 
             // Processing options
             chkEnableConversion.Checked = settings.EnableVideoConversion;
@@ -29,7 +38,16 @@ namespace SteamRecUtility
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
 
             // Encoder selection
-            settings.VideoEncoder = cmbEncoder.SelectedIndex == 0 ? "libx265" : "hevc_nvenc";
+            settings.VideoEncoder = cmbEncoder.SelectedIndex switch
+            {
+                0 => "libx265",
+                1 => "hevc_nvenc",
+                2 => "av1_nvenc",
+                _ => "hevc_nvenc"
+            };
+
+            // Scaling mode
+            settings.ScalingMode = cmbScalingMode.SelectedIndex == 0 ? "sar" : "scale";
 
             // Processing options
             settings.EnableVideoConversion = chkEnableConversion.Checked;

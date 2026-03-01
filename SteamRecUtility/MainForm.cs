@@ -50,8 +50,9 @@ namespace SteamRecUtility
         private Button btnReset = null!;
         private Button btnRefreshPreview = null!;
 
-        // Resolution and quality
+        // Resolution, scaling, and quality
         private ComboBox cmbResolution = null!;
+        private ComboBox cmbScalingMode = null!;
         private ComboBox cmbEncoder = null!;
         private CheckBox chkMoveProcessed = null!;
 
@@ -591,6 +592,20 @@ namespace SteamRecUtility
             settingsContainer.Controls.AddRange(new Control[] { lblResolution, cmbResolution });
             y += 35;
 
+            // Scaling mode
+            var lblScalingMode = new Label { Text = "Scaling:", Location = new Point(10, y + 3), Width = labelWidth };
+            cmbScalingMode = new ComboBox
+            {
+                Location = new Point(10 + labelWidth, y),
+                Width = 200,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbScalingMode.Items.AddRange(new[] { "SAR (preserve pixels)", "Scale (resample)" });
+            cmbScalingMode.SelectedIndex = 0;
+
+            settingsContainer.Controls.AddRange(new Control[] { lblScalingMode, cmbScalingMode });
+            y += 30;
+
             var lblEncoder = new Label { Text = "Encoder:", Location = new Point(10, y + 3), Width = labelWidth };
             cmbEncoder = new ComboBox
             {
@@ -598,8 +613,8 @@ namespace SteamRecUtility
                 Width = 200,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU)" });
-            cmbEncoder.SelectedIndex = 0;
+            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU HEVC)", "av1_nvenc (GPU AV1)" });
+            cmbEncoder.SelectedIndex = 1;
 
             var lblEncoderNote = new Label
             {
@@ -780,7 +795,16 @@ namespace SteamRecUtility
                 chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
                 // Update encoder dropdown to match settings
-                cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
+                cmbEncoder.SelectedIndex = settings.VideoEncoder switch
+                {
+                    "libx265" => 0,
+                    "hevc_nvenc" => 1,
+                    "av1_nvenc" => 2,
+                    _ => 1
+                };
+
+                // Update scaling mode dropdown
+                cmbScalingMode.SelectedIndex = settings.ScalingMode == "sar" ? 0 : 1;
 
                 // Update trackbar defaults for new videos
                 trackBrightness.Value = (int)(settings.Brightness * 100);
@@ -894,6 +918,7 @@ namespace SteamRecUtility
             // Scaling controls
             chkEnableScaling.Enabled = conversionEnabled;
             cmbResolution.Enabled = scalingEnabled;
+            cmbScalingMode.Enabled = scalingEnabled;
 
             // Color adjustment controls
             chkEnableColorAdjustments.Enabled = conversionEnabled;

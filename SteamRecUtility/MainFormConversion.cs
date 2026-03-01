@@ -94,13 +94,14 @@ namespace SteamRecUtility
 
             LogInfo($"Starting conversion of {videos.Count} video(s)");
             LogInfo($"Encoder: {settings.VideoEncoder}");
+            LogInfo($"Scaling Mode: {(settings.ScalingMode == "sar" ? "SAR (preserve pixels)" : "Scale (resample)")}");
             if (settings.VideoEncoder == "libx265")
             {
                 LogInfo($"  libx265 settings - CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
             }
             else
             {
-                LogInfo($"  hevc_nvenc settings - CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, RC: {settings.NvencRateControl}, Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}");
+                LogInfo($"  NVENC settings - CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, Tune: {settings.NvencTune}, RC: {settings.NvencRateControl}, Multipass: {settings.NvencMultipass}, B-Frames: {settings.NvencBFrames}, Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}");
             }
             LogInfo("");
 
@@ -124,12 +125,30 @@ namespace SteamRecUtility
                     // Build dynamic filter chain based on enabled options
                     var filters = new List<string>();
 
-                    // Scaling filter (if enabled)
+                    // Scaling / SAR filter (if enabled)
                     if (settings.EnableScaling)
                     {
-                        filters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
-                        filters.Add("setdar=16/9");
-                        LogInfo($"  Scaling: {video.OutputWidth}x{video.OutputHeight}");
+                        if (settings.ScalingMode == "sar")
+                        {
+                            // SAR mode: preserve original pixels, set sample aspect ratio for 16:9 display
+                            var (sarNum, sarDen) = ComputeSarFor16by9(video.OutputWidth, video.OutputHeight);
+                            if (sarNum != sarDen) // Skip if already 16:9
+                            {
+                                filters.Add($"setsar={sarNum}/{sarDen}");
+                                LogInfo($"  SAR: {sarNum}/{sarDen} (preserving {video.OutputWidth}x{video.OutputHeight} pixels, displays as 16:9)");
+                            }
+                            else
+                            {
+                                LogInfo($"  Already 16:9 ({video.OutputWidth}x{video.OutputHeight}), no SAR needed");
+                            }
+                        }
+                        else
+                        {
+                            // Traditional scale mode: resample pixels to target resolution
+                            filters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
+                            filters.Add("setdar=16/9");
+                            LogInfo($"  Scaling: {video.OutputWidth}x{video.OutputHeight}");
+                        }
                     }
 
                     // Color adjustment filter (if enabled)
@@ -429,13 +448,14 @@ namespace SteamRecUtility
             }
         }
 
-        private bool? _nvencAvailable = null;
+        private bool? _hevcNvencAvailable = null;
+        private bool? _av1NvencAvailable = null;
+        private string? _encoderListCache = null;
 
-        private bool IsNvencAvailable()
+        private string GetEncoderList()
         {
-            // Cache the result to avoid repeated checks
-            if (_nvencAvailable.HasValue)
-                return _nvencAvailable.Value;
+            if (_encoderListCache != null)
+                return _encoderListCache;
 
             try
             {
@@ -452,32 +472,58 @@ namespace SteamRecUtility
                 using Process? process = Process.Start(psi);
                 if (process == null)
                 {
-                    _nvencAvailable = false;
-                    return false;
+                    _encoderListCache = "";
+                    return "";
                 }
 
                 string output = process.StandardOutput.ReadToEnd();
                 process.WaitForExit();
 
-                _nvencAvailable = output.Contains("hevc_nvenc");
-                return _nvencAvailable.Value;
+                _encoderListCache = output;
+                return output;
             }
             catch
             {
-                _nvencAvailable = false;
-                return false;
+                _encoderListCache = "";
+                return "";
             }
+        }
+
+        private bool IsNvencAvailable()
+        {
+            if (_hevcNvencAvailable.HasValue)
+                return _hevcNvencAvailable.Value;
+
+            _hevcNvencAvailable = GetEncoderList().Contains("hevc_nvenc");
+            return _hevcNvencAvailable.Value;
+        }
+
+        private bool IsAv1NvencAvailable()
+        {
+            if (_av1NvencAvailable.HasValue)
+                return _av1NvencAvailable.Value;
+
+            _av1NvencAvailable = GetEncoderList().Contains("av1_nvenc");
+            return _av1NvencAvailable.Value;
         }
 
         private string GetEncoderArguments(string encoder)
         {
-            if (encoder == "hevc_nvenc")
+            if (encoder == "hevc_nvenc" || encoder == "av1_nvenc")
             {
-                // hevc_nvenc (GPU) encoder settings - single-pass only
-                var args = $"-c:v hevc_nvenc -preset {settings.NvencPreset} -rc {settings.NvencRateControl}";
+                // NVENC (GPU) encoder settings - modern SDK presets (p1-p7)
+                var args = $"-c:v {encoder} -preset {settings.NvencPreset} -tune {settings.NvencTune} -rc {settings.NvencRateControl}";
 
                 // CQ level (quality parameter)
                 args += $" -cq {settings.NvencCQ}";
+
+                // Multipass encoding
+                if (settings.NvencMultipass != "disabled")
+                    args += $" -multipass {settings.NvencMultipass}";
+
+                // B-frames for better compression
+                if (settings.NvencBFrames > 0)
+                    args += $" -bf {settings.NvencBFrames}";
 
                 // Adaptive quantization
                 if (settings.NvencSpatialAQ)
@@ -490,7 +536,7 @@ namespace SteamRecUtility
             }
             else
             {
-                // libx265 (CPU) encoder settings - single-pass only
+                // libx265 (CPU) encoder settings
                 var args = $"-c:v libx265 -crf {settings.X265CRF} -preset {settings.X265Preset}";
 
                 // Add tune if specified
@@ -506,7 +552,19 @@ namespace SteamRecUtility
         {
             string requestedEncoder = settings.VideoEncoder;
 
-            // If NVENC requested but not available, fall back to libx265
+            // Fallback chain: av1_nvenc → hevc_nvenc → libx265
+            if (requestedEncoder == "av1_nvenc" && !IsAv1NvencAvailable())
+            {
+                LogWarning("AV1 NVENC encoder not available.");
+                if (IsNvencAvailable())
+                {
+                    LogWarning("Falling back to HEVC NVENC (hevc_nvenc).");
+                    return "hevc_nvenc";
+                }
+                LogWarning("Falling back to CPU encoder (libx265).");
+                return "libx265";
+            }
+
             if (requestedEncoder == "hevc_nvenc" && !IsNvencAvailable())
             {
                 LogWarning("NVENC encoder not available. Falling back to CPU encoder (libx265).");
@@ -514,6 +572,31 @@ namespace SteamRecUtility
             }
 
             return requestedEncoder;
+        }
+
+        /// <summary>
+        /// Computes the SAR (Sample Aspect Ratio) needed to make the given resolution
+        /// display at 16:9. Returns (numerator, denominator) simplified by GCD.
+        /// </summary>
+        private static (int num, int den) ComputeSarFor16by9(int width, int height)
+        {
+            // DAR = SAR * (width / height) = 16/9
+            // SAR = (16 * height) / (9 * width)
+            int num = 16 * height;
+            int den = 9 * width;
+            int gcd = GCD(num, den);
+            return (num / gcd, den / gcd);
+        }
+
+        private static int GCD(int a, int b)
+        {
+            while (b != 0)
+            {
+                int temp = b;
+                b = a % b;
+                a = temp;
+            }
+            return a;
         }
 
         private void LogInfo(string message)

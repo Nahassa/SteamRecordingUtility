@@ -15,10 +15,11 @@ namespace SteamRecUtility
         private Label lblDefaultContrastValue = null!;
         private Label lblDefaultSaturationValue = null!;
 
-        // Resolution
+        // Resolution and scaling
         private ComboBox cmbDefaultResolution = null!;
         private NumericUpDown numCustomWidth = null!;
         private NumericUpDown numCustomHeight = null!;
+        private ComboBox cmbScalingMode = null!;
 
         // Encoder selection
         private ComboBox cmbEncoder = null!;
@@ -29,11 +30,14 @@ namespace SteamRecUtility
         private ComboBox cmbX265Preset = null!;
         private ComboBox cmbX265Tune = null!;
 
-        // hevc_nvenc controls
+        // NVENC controls (hevc_nvenc / av1_nvenc)
         private Panel pnlNvencSettings = null!;
         private NumericUpDown numNvencCQ = null!;
         private ComboBox cmbNvencPreset = null!;
+        private ComboBox cmbNvencTune = null!;
         private ComboBox cmbNvencRateControl = null!;
+        private ComboBox cmbNvencMultipass = null!;
+        private NumericUpDown numNvencBFrames = null!;
         private CheckBox chkNvencSpatialAQ = null!;
         private CheckBox chkNvencTemporalAQ = null!;
 
@@ -54,7 +58,7 @@ namespace SteamRecUtility
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(500, 620);
+            this.Size = new Size(500, 750);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -151,7 +155,7 @@ namespace SteamRecUtility
             {
                 Text = "Default Output Settings",
                 Location = new Point(10, y),
-                Size = new Size(465, 320)
+                Size = new Size(465, 430)
             };
             this.Controls.Add(grpOutput);
 
@@ -192,15 +196,36 @@ namespace SteamRecUtility
             grpOutput.Controls.AddRange(new Control[] { lblCustomRes, numCustomWidth, lblX, numCustomHeight });
             gy += 35;
 
+            // Scaling mode
+            var lblScalingMode = new Label { Text = "Scaling Mode:", Location = new Point(15, gy + 3), Width = labelWidth };
+            cmbScalingMode = new ComboBox
+            {
+                Location = new Point(controlLeft, gy),
+                Width = 250,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbScalingMode.Items.AddRange(new[] { "SAR (preserve pixels, tag for 16:9)", "Scale (resample pixels to target)" });
+            var lblScalingModeHelp = new Label
+            {
+                Text = "SAR preserves original quality. Scale resamples to exact resolution.",
+                Location = new Point(controlLeft, gy + 25),
+                Width = 300,
+                Height = 16,
+                ForeColor = System.Drawing.Color.Gray,
+                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+            };
+            grpOutput.Controls.AddRange(new Control[] { lblScalingMode, cmbScalingMode, lblScalingModeHelp });
+            gy += 48;
+
             // Encoder selection
             var lblEncoder = new Label { Text = "Video Encoder:", Location = new Point(15, gy + 3), Width = labelWidth };
             cmbEncoder = new ComboBox
             {
                 Location = new Point(controlLeft, gy),
-                Width = 150,
+                Width = 200,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU)" });
+            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU HEVC)", "av1_nvenc (GPU AV1)" });
             cmbEncoder.SelectedIndexChanged += CmbEncoder_SelectedIndexChanged;
             grpOutput.Controls.AddRange(new Control[] { lblEncoder, cmbEncoder });
             gy += 35;
@@ -279,11 +304,11 @@ namespace SteamRecUtility
             };
             pnlX265Settings.Controls.AddRange(new Control[] { lblX265Tune, cmbX265Tune, lblX265TuneHelp });
 
-            // === hevc_nvenc Settings Panel ===
+            // === NVENC Settings Panel (shared by hevc_nvenc and av1_nvenc) ===
             pnlNvencSettings = new Panel
             {
                 Location = new Point(10, gy),
-                Size = new Size(445, 170),
+                Size = new Size(445, 280),
                 Visible = false
             };
             grpOutput.Controls.Add(pnlNvencSettings);
@@ -305,23 +330,35 @@ namespace SteamRecUtility
                 Text = "Lower = better quality. 19-23 recommended.",
                 Location = new Point(controlLeft - 10, nvency + 25),
                 Width = 300,
-                Height = 30,
+                Height = 16,
                 ForeColor = System.Drawing.Color.Gray,
                 Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
             };
             pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencCQ, numNvencCQ, lblNvencCQHelp });
-            nvency += 55;
+            nvency += 45;
 
-            // Preset
+            // Preset (modern p1-p7)
             var lblNvencPreset = new Label { Text = "Preset:", Location = new Point(5, nvency + 3), Width = labelWidth };
             cmbNvencPreset = new ComboBox
             {
                 Location = new Point(controlLeft - 10, nvency),
-                Width = 120,
+                Width = 160,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbNvencPreset.Items.AddRange(new[] { "default", "slow", "medium", "fast", "hp", "hq", "bd", "ll", "llhq", "llhp", "lossless" });
+            cmbNvencPreset.Items.AddRange(new[] { "p1 (Fastest)", "p2", "p3", "p4", "p5", "p6", "p7 (Best Quality)" });
             pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencPreset, cmbNvencPreset });
+            nvency += 30;
+
+            // Tune
+            var lblNvencTune = new Label { Text = "Tune:", Location = new Point(5, nvency + 3), Width = labelWidth };
+            cmbNvencTune = new ComboBox
+            {
+                Location = new Point(controlLeft - 10, nvency),
+                Width = 160,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbNvencTune.Items.AddRange(new[] { "hq (High Quality)", "ll (Low Latency)", "ull (Ultra Low Latency)", "lossless" });
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencTune, cmbNvencTune });
             nvency += 30;
 
             // Rate Control
@@ -333,24 +370,40 @@ namespace SteamRecUtility
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbNvencRateControl.Items.AddRange(new[] { "constqp", "vbr", "cbr" });
-            var lblNvencRCHelp = new Label
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencRC, cmbNvencRateControl });
+            nvency += 30;
+
+            // Multipass
+            var lblNvencMultipass = new Label { Text = "Multipass:", Location = new Point(5, nvency + 3), Width = labelWidth };
+            cmbNvencMultipass = new ComboBox
             {
-                Text = "constqp = constant quality (recommended)",
-                Location = new Point(controlLeft - 10, nvency + 25),
-                Width = 300,
-                Height = 30,
-                ForeColor = System.Drawing.Color.Gray,
-                Font = new System.Drawing.Font(this.Font.FontFamily, 7.5f)
+                Location = new Point(controlLeft - 10, nvency),
+                Width = 160,
+                DropDownStyle = ComboBoxStyle.DropDownList
             };
-            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencRC, cmbNvencRateControl, lblNvencRCHelp });
-            nvency += 55;
+            cmbNvencMultipass.Items.AddRange(new[] { "disabled", "qres (Quarter Res)", "fullres (Full Res)" });
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencMultipass, cmbNvencMultipass });
+            nvency += 30;
+
+            // B-Frames
+            var lblNvencBFrames = new Label { Text = "B-Frames (0-4):", Location = new Point(5, nvency + 3), Width = labelWidth };
+            numNvencBFrames = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, nvency),
+                Width = 60,
+                Minimum = 0,
+                Maximum = 4,
+                Value = 3
+            };
+            pnlNvencSettings.Controls.AddRange(new Control[] { lblNvencBFrames, numNvencBFrames });
+            nvency += 30;
 
             // Adaptive Quantization checkboxes
             chkNvencSpatialAQ = new CheckBox
             {
-                Text = "Spatial AQ (improves quality)",
+                Text = "Spatial AQ (improves quality in flat areas)",
                 Location = new Point(controlLeft - 10, nvency),
-                Width = 250,
+                Width = 280,
                 Checked = true
             };
             pnlNvencSettings.Controls.Add(chkNvencSpatialAQ);
@@ -360,7 +413,7 @@ namespace SteamRecUtility
             {
                 Text = "Temporal AQ (improves motion quality)",
                 Location = new Point(controlLeft - 10, nvency),
-                Width = 250,
+                Width = 280,
                 Checked = true
             };
             pnlNvencSettings.Controls.Add(chkNvencTemporalAQ);
@@ -443,18 +496,30 @@ namespace SteamRecUtility
             numCustomHeight.Value = settings.OutputHeight;
             UpdateCustomResolutionEnabled();
 
+            // Scaling mode
+            cmbScalingMode.SelectedIndex = settings.ScalingMode == "sar" ? 0 : 1;
+
             // Encoder
-            cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
+            cmbEncoder.SelectedIndex = settings.VideoEncoder switch
+            {
+                "libx265" => 0,
+                "hevc_nvenc" => 1,
+                "av1_nvenc" => 2,
+                _ => 1
+            };
 
             // libx265 settings
             numX265CRF.Value = settings.X265CRF;
             cmbX265Preset.SelectedItem = settings.X265Preset;
             cmbX265Tune.SelectedItem = string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune;
 
-            // hevc_nvenc settings
+            // NVENC settings
             numNvencCQ.Value = settings.NvencCQ;
-            cmbNvencPreset.SelectedItem = settings.NvencPreset;
+            SelectNvencPreset(settings.NvencPreset);
+            SelectNvencTune(settings.NvencTune);
             cmbNvencRateControl.SelectedItem = settings.NvencRateControl;
+            SelectNvencMultipass(settings.NvencMultipass);
+            numNvencBFrames.Value = settings.NvencBFrames;
             chkNvencSpatialAQ.Checked = settings.NvencSpatialAQ;
             chkNvencTemporalAQ.Checked = settings.NvencTemporalAQ;
 
@@ -462,6 +527,68 @@ namespace SteamRecUtility
 
             // File handling
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
+        }
+
+        /// <summary>
+        /// Select the NVENC preset dropdown item by the raw preset value (e.g. "p7")
+        /// </summary>
+        private void SelectNvencPreset(string preset)
+        {
+            for (int i = 0; i < cmbNvencPreset.Items.Count; i++)
+            {
+                string item = cmbNvencPreset.Items[i]?.ToString() ?? "";
+                if (item.StartsWith(preset, StringComparison.OrdinalIgnoreCase))
+                {
+                    cmbNvencPreset.SelectedIndex = i;
+                    return;
+                }
+            }
+            cmbNvencPreset.SelectedIndex = 6; // Default to p7
+        }
+
+        /// <summary>
+        /// Select the NVENC tune dropdown item by the raw tune value (e.g. "hq")
+        /// </summary>
+        private void SelectNvencTune(string tune)
+        {
+            for (int i = 0; i < cmbNvencTune.Items.Count; i++)
+            {
+                string item = cmbNvencTune.Items[i]?.ToString() ?? "";
+                if (item.StartsWith(tune, StringComparison.OrdinalIgnoreCase))
+                {
+                    cmbNvencTune.SelectedIndex = i;
+                    return;
+                }
+            }
+            cmbNvencTune.SelectedIndex = 0; // Default to hq
+        }
+
+        /// <summary>
+        /// Select the NVENC multipass dropdown item by the raw value (e.g. "fullres")
+        /// </summary>
+        private void SelectNvencMultipass(string multipass)
+        {
+            for (int i = 0; i < cmbNvencMultipass.Items.Count; i++)
+            {
+                string item = cmbNvencMultipass.Items[i]?.ToString() ?? "";
+                if (item.StartsWith(multipass, StringComparison.OrdinalIgnoreCase))
+                {
+                    cmbNvencMultipass.SelectedIndex = i;
+                    return;
+                }
+            }
+            cmbNvencMultipass.SelectedIndex = 2; // Default to fullres
+        }
+
+        /// <summary>
+        /// Extract the raw value from a dropdown item like "p7 (Best Quality)" → "p7"
+        /// </summary>
+        private static string ExtractDropdownValue(string? item, string fallback)
+        {
+            if (string.IsNullOrEmpty(item)) return fallback;
+            // Take everything before the first space (or parenthesis)
+            int spaceIdx = item.IndexOf(' ');
+            return spaceIdx > 0 ? item.Substring(0, spaceIdx) : item;
         }
 
         private void UpdateAdjustmentLabels()
@@ -540,17 +667,21 @@ namespace SteamRecUtility
                 cmbDefaultResolution.SelectedIndex = 0;
                 numCustomWidth.Value = 1920;
                 numCustomHeight.Value = 1080;
-                cmbEncoder.SelectedIndex = 0; // libx265
+                cmbScalingMode.SelectedIndex = 0; // SAR
+                cmbEncoder.SelectedIndex = 1; // hevc_nvenc
 
                 // libx265 defaults
                 numX265CRF.Value = 23;
                 cmbX265Preset.SelectedItem = "medium";
                 cmbX265Tune.SelectedItem = "(none)";
 
-                // hevc_nvenc defaults
+                // NVENC defaults
                 numNvencCQ.Value = 21;
-                cmbNvencPreset.SelectedItem = "hq";
+                SelectNvencPreset("p7");
+                SelectNvencTune("hq");
                 cmbNvencRateControl.SelectedItem = "constqp";
+                SelectNvencMultipass("fullres");
+                numNvencBFrames.Value = 3;
                 chkNvencSpatialAQ.Checked = true;
                 chkNvencTemporalAQ.Checked = true;
 
@@ -569,18 +700,30 @@ namespace SteamRecUtility
             settings.OutputWidth = (int)numCustomWidth.Value;
             settings.OutputHeight = (int)numCustomHeight.Value;
 
+            // Scaling mode
+            settings.ScalingMode = cmbScalingMode.SelectedIndex == 0 ? "sar" : "scale";
+
             // Encoder
-            settings.VideoEncoder = cmbEncoder.SelectedIndex == 0 ? "libx265" : "hevc_nvenc";
+            settings.VideoEncoder = cmbEncoder.SelectedIndex switch
+            {
+                0 => "libx265",
+                1 => "hevc_nvenc",
+                2 => "av1_nvenc",
+                _ => "hevc_nvenc"
+            };
 
             // libx265 settings
             settings.X265CRF = (int)numX265CRF.Value;
             settings.X265Preset = cmbX265Preset.SelectedItem?.ToString() ?? "medium";
             settings.X265Tune = cmbX265Tune.SelectedItem?.ToString() == "(none)" ? "" : cmbX265Tune.SelectedItem?.ToString() ?? "";
 
-            // hevc_nvenc settings
+            // NVENC settings
             settings.NvencCQ = (int)numNvencCQ.Value;
-            settings.NvencPreset = cmbNvencPreset.SelectedItem?.ToString() ?? "hq";
+            settings.NvencPreset = ExtractDropdownValue(cmbNvencPreset.SelectedItem?.ToString(), "p7");
+            settings.NvencTune = ExtractDropdownValue(cmbNvencTune.SelectedItem?.ToString(), "hq");
             settings.NvencRateControl = cmbNvencRateControl.SelectedItem?.ToString() ?? "constqp";
+            settings.NvencMultipass = ExtractDropdownValue(cmbNvencMultipass.SelectedItem?.ToString(), "fullres");
+            settings.NvencBFrames = (int)numNvencBFrames.Value;
             settings.NvencSpatialAQ = chkNvencSpatialAQ.Checked;
             settings.NvencTemporalAQ = chkNvencTemporalAQ.Checked;
 

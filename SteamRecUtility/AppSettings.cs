@@ -11,18 +11,24 @@ namespace SteamRecUtility
         public double Brightness { get; set; } = 0.0;  // -1.0 to 1.0 (default 0.0 = no change)
         public double Contrast { get; set; } = 1.0;    // 0.0 to 4.0 (default 1.0 = no change)
         public double Saturation { get; set; } = 1.2;
-        public string VideoEncoder { get; set; } = "libx265"; // libx265, hevc_nvenc
+        public string VideoEncoder { get; set; } = "hevc_nvenc"; // libx265, hevc_nvenc, av1_nvenc
         public bool MoveProcessedFiles { get; set; } = true;
+
+        // Scaling mode: "scale" = resample pixels (traditional), "sar" = set sample aspect ratio (preserve pixels)
+        public string ScalingMode { get; set; } = "sar";
 
         // libx265 (CPU) encoder settings
         public int X265CRF { get; set; } = 23;
         public string X265Preset { get; set; } = "medium";
         public string X265Tune { get; set; } = ""; // empty = none
 
-        // hevc_nvenc (GPU) encoder settings
+        // NVENC (GPU) encoder settings - modern SDK presets (RTX 5080 / Ada+)
         public int NvencCQ { get; set; } = 21;
-        public string NvencPreset { get; set; } = "hq";
+        public string NvencPreset { get; set; } = "p7";        // p1 (fastest) to p7 (best quality)
+        public string NvencTune { get; set; } = "hq";          // hq, ll, ull, lossless
         public string NvencRateControl { get; set; } = "constqp";
+        public string NvencMultipass { get; set; } = "fullres"; // disabled, qres, fullres
+        public int NvencBFrames { get; set; } = 3;             // 0-4, B-frames for better compression
         public bool NvencSpatialAQ { get; set; } = true;
         public bool NvencTemporalAQ { get; set; } = true;
 
