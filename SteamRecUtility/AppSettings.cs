@@ -25,12 +25,18 @@ namespace SteamRecUtility
         // NVENC (GPU) encoder settings - modern SDK presets (RTX 5080 / Ada+)
         public int NvencCQ { get; set; } = 21;
         public string NvencPreset { get; set; } = "p7";        // p1 (fastest) to p7 (best quality)
-        public string NvencTune { get; set; } = "hq";          // hq, ll, ull, lossless
+        public string NvencTune { get; set; } = "hq";          // hq, ll, ull, lossless, uhq
         public string NvencRateControl { get; set; } = "constqp";
         public string NvencMultipass { get; set; } = "fullres"; // disabled, qres, fullres
         public int NvencBFrames { get; set; } = 3;             // 0-4, B-frames for better compression
         public bool NvencSpatialAQ { get; set; } = true;
         public bool NvencTemporalAQ { get; set; } = true;
+
+        // Ultra High Quality mode (av1_nvenc UHQ)
+        public bool NvencUHQMode { get; set; } = false;
+        public int NvencUHQBitrate { get; set; } = 15;         // Target bitrate in Mbps
+        public int NvencUHQMaxrate { get; set; } = 30;         // Max bitrate in Mbps
+        public int NvencUHQRcLookahead { get; set; } = 32;     // Lookahead frames
 
         // Processing Options
         public bool EnableVideoConversion { get; set; } = true;

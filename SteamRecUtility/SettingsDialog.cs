@@ -41,6 +41,13 @@ namespace SteamRecUtility
         private CheckBox chkNvencSpatialAQ = null!;
         private CheckBox chkNvencTemporalAQ = null!;
 
+        // UHQ mode controls
+        private CheckBox chkNvencUHQ = null!;
+        private NumericUpDown numUHQBitrate = null!;
+        private NumericUpDown numUHQMaxrate = null!;
+        private NumericUpDown numUHQRcLookahead = null!;
+        private Panel pnlUHQSettings = null!;
+
         // Other settings
         private CheckBox chkMoveProcessed = null!;
 
@@ -58,7 +65,7 @@ namespace SteamRecUtility
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(500, 750);
+            this.Size = new Size(500, 850);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -155,7 +162,7 @@ namespace SteamRecUtility
             {
                 Text = "Default Output Settings",
                 Location = new Point(10, y),
-                Size = new Size(465, 430)
+                Size = new Size(465, 530)
             };
             this.Controls.Add(grpOutput);
 
@@ -308,7 +315,7 @@ namespace SteamRecUtility
             pnlNvencSettings = new Panel
             {
                 Location = new Point(10, gy),
-                Size = new Size(445, 280),
+                Size = new Size(445, 400),
                 Visible = false
             };
             grpOutput.Controls.Add(pnlNvencSettings);
@@ -417,6 +424,64 @@ namespace SteamRecUtility
                 Checked = true
             };
             pnlNvencSettings.Controls.Add(chkNvencTemporalAQ);
+            nvency += 30;
+
+            // === Ultra High Quality Mode ===
+            chkNvencUHQ = new CheckBox
+            {
+                Text = "Ultra High Quality (av1_nvenc UHQ)",
+                Location = new Point(5, nvency),
+                Width = 300,
+                Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
+                Checked = false
+            };
+            chkNvencUHQ.CheckedChanged += ChkNvencUHQ_CheckedChanged;
+            pnlNvencSettings.Controls.Add(chkNvencUHQ);
+            nvency += 25;
+
+            pnlUHQSettings = new Panel
+            {
+                Location = new Point(0, nvency),
+                Size = new Size(445, 75),
+                Visible = false
+            };
+            pnlNvencSettings.Controls.Add(pnlUHQSettings);
+
+            int uhqy = 0;
+            var lblUHQBitrate = new Label { Text = "Bitrate (Mbps):", Location = new Point(5, uhqy + 3), Width = labelWidth };
+            numUHQBitrate = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, uhqy),
+                Width = 60,
+                Minimum = 1,
+                Maximum = 100,
+                Value = 15
+            };
+            pnlUHQSettings.Controls.AddRange(new Control[] { lblUHQBitrate, numUHQBitrate });
+            uhqy += 28;
+
+            var lblUHQMaxrate = new Label { Text = "Max Rate (Mbps):", Location = new Point(5, uhqy + 3), Width = labelWidth };
+            numUHQMaxrate = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, uhqy),
+                Width = 60,
+                Minimum = 1,
+                Maximum = 200,
+                Value = 30
+            };
+            pnlUHQSettings.Controls.AddRange(new Control[] { lblUHQMaxrate, numUHQMaxrate });
+            uhqy += 28;
+
+            var lblUHQLookahead = new Label { Text = "RC Lookahead:", Location = new Point(5, uhqy + 3), Width = labelWidth };
+            numUHQRcLookahead = new NumericUpDown
+            {
+                Location = new Point(controlLeft - 10, uhqy),
+                Width = 60,
+                Minimum = 0,
+                Maximum = 64,
+                Value = 32
+            };
+            pnlUHQSettings.Controls.AddRange(new Control[] { lblUHQLookahead, numUHQRcLookahead });
 
             y += grpOutput.Height + 15;
 
@@ -523,6 +588,13 @@ namespace SteamRecUtility
             chkNvencSpatialAQ.Checked = settings.NvencSpatialAQ;
             chkNvencTemporalAQ.Checked = settings.NvencTemporalAQ;
 
+            // UHQ mode
+            chkNvencUHQ.Checked = settings.NvencUHQMode;
+            numUHQBitrate.Value = settings.NvencUHQBitrate;
+            numUHQMaxrate.Value = settings.NvencUHQMaxrate;
+            numUHQRcLookahead.Value = settings.NvencUHQRcLookahead;
+            pnlUHQSettings.Visible = settings.NvencUHQMode;
+
             UpdateEncoderPanels();
 
             // File handling
@@ -589,6 +661,11 @@ namespace SteamRecUtility
             // Take everything before the first space (or parenthesis)
             int spaceIdx = item.IndexOf(' ');
             return spaceIdx > 0 ? item.Substring(0, spaceIdx) : item;
+        }
+
+        private void ChkNvencUHQ_CheckedChanged(object? sender, EventArgs e)
+        {
+            pnlUHQSettings.Visible = chkNvencUHQ.Checked;
         }
 
         private void UpdateAdjustmentLabels()
@@ -685,6 +762,13 @@ namespace SteamRecUtility
                 chkNvencSpatialAQ.Checked = true;
                 chkNvencTemporalAQ.Checked = true;
 
+                // UHQ defaults
+                chkNvencUHQ.Checked = false;
+                numUHQBitrate.Value = 15;
+                numUHQMaxrate.Value = 30;
+                numUHQRcLookahead.Value = 32;
+                pnlUHQSettings.Visible = false;
+
                 chkMoveProcessed.Checked = true;
                 UpdateAdjustmentLabels();
                 UpdateEncoderPanels();
@@ -726,6 +810,12 @@ namespace SteamRecUtility
             settings.NvencBFrames = (int)numNvencBFrames.Value;
             settings.NvencSpatialAQ = chkNvencSpatialAQ.Checked;
             settings.NvencTemporalAQ = chkNvencTemporalAQ.Checked;
+
+            // UHQ mode
+            settings.NvencUHQMode = chkNvencUHQ.Checked;
+            settings.NvencUHQBitrate = (int)numUHQBitrate.Value;
+            settings.NvencUHQMaxrate = (int)numUHQMaxrate.Value;
+            settings.NvencUHQRcLookahead = (int)numUHQRcLookahead.Value;
 
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
 

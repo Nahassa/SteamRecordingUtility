@@ -93,15 +93,24 @@ namespace SteamRecUtility
             }
 
             LogInfo($"Starting conversion of {videos.Count} video(s)");
-            LogInfo($"Encoder: {settings.VideoEncoder}");
-            LogInfo($"Scaling Mode: {(settings.ScalingMode == "sar" ? "SAR (preserve pixels)" : "Scale (resample)")}");
-            if (settings.VideoEncoder == "libx265")
+            if (settings.NvencUHQMode)
             {
-                LogInfo($"  libx265 settings - CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
+                LogInfo("Mode: Ultra High Quality (av1_nvenc UHQ)");
+                LogInfo($"  Bitrate: {settings.NvencUHQBitrate}M, Max: {settings.NvencUHQMaxrate}M, RC-Lookahead: {settings.NvencUHQRcLookahead}");
+                LogInfo($"  Scaling: {(settings.EnableScaling && settings.ScalingMode != "sar" ? "scale_cuda (GPU-accelerated)" : settings.ScalingMode == "sar" ? "SAR (preserve pixels)" : "disabled")}");
             }
             else
             {
-                LogInfo($"  NVENC settings - CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, Tune: {settings.NvencTune}, RC: {settings.NvencRateControl}, Multipass: {settings.NvencMultipass}, B-Frames: {settings.NvencBFrames}, Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}");
+                LogInfo($"Encoder: {settings.VideoEncoder}");
+                LogInfo($"Scaling Mode: {(settings.ScalingMode == "sar" ? "SAR (preserve pixels)" : "Scale (resample)")}");
+                if (settings.VideoEncoder == "libx265")
+                {
+                    LogInfo($"  libx265 settings - CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
+                }
+                else
+                {
+                    LogInfo($"  NVENC settings - CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, Tune: {settings.NvencTune}, RC: {settings.NvencRateControl}, Multipass: {settings.NvencMultipass}, B-Frames: {settings.NvencBFrames}, Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}");
+                }
             }
             LogInfo("");
 
@@ -126,6 +135,7 @@ namespace SteamRecUtility
                     var filters = new List<string>();
 
                     // Scaling / SAR filter (if enabled)
+                    bool useHwaccelCuda = false;
                     if (settings.EnableScaling)
                     {
                         if (settings.ScalingMode == "sar")
@@ -141,6 +151,14 @@ namespace SteamRecUtility
                             {
                                 LogInfo($"  Already 16:9 ({video.OutputWidth}x{video.OutputHeight}), no SAR needed");
                             }
+                        }
+                        else if (settings.NvencUHQMode)
+                        {
+                            // UHQ mode: GPU-accelerated scaling via CUDA
+                            filters.Add($"scale_cuda={video.OutputWidth}:{video.OutputHeight}:interp_algo=lanczos");
+                            filters.Add("setdar=16/9");
+                            useHwaccelCuda = true;
+                            LogInfo($"  CUDA Scaling: {video.OutputWidth}x{video.OutputHeight} (GPU-accelerated)");
                         }
                         else
                         {
@@ -167,17 +185,18 @@ namespace SteamRecUtility
                     LogInfo($"  Using encoder: {encoder}");
 
                     // Build FFmpeg command
+                    string hwaccelFlags = useHwaccelCuda ? "-hwaccel cuda -hwaccel_output_format cuda " : "";
                     string args;
                     if (filters.Count > 0)
                     {
                         string vf = string.Join(",", filters);
-                        args = $"-y -i \"{inputPath}\" -vf \"{vf}\" {encoderArgs} \"{outputPath}\"";
+                        args = $"-y {hwaccelFlags}-i \"{inputPath}\" -vf \"{vf}\" {encoderArgs} \"{outputPath}\"";
                     }
                     else
                     {
                         // No filters, just re-encode
                         LogInfo("  Re-encoding only (no scaling or color adjustments)");
-                        args = $"-y -i \"{inputPath}\" {encoderArgs} \"{outputPath}\"";
+                        args = $"-y {hwaccelFlags}-i \"{inputPath}\" {encoderArgs} \"{outputPath}\"";
                     }
 
                     success = await RunFFmpegAsync(args);
@@ -509,6 +528,17 @@ namespace SteamRecUtility
 
         private string GetEncoderArguments(string encoder)
         {
+            if (settings.NvencUHQMode)
+            {
+                // Ultra High Quality mode: av1_nvenc with VBR bitrate targeting
+                var args = $"-c:v av1_nvenc -preset p7 -tune uhq";
+                args += $" -b:v {settings.NvencUHQBitrate}M -maxrate {settings.NvencUHQMaxrate}M -bufsize {settings.NvencUHQMaxrate}M";
+                args += $" -rc-lookahead {settings.NvencUHQRcLookahead}";
+                args += " -spatial_aq 1 -temporal_aq 1";
+                args += " -pix_fmt yuv420p";
+                return args;
+            }
+
             if (encoder == "hevc_nvenc" || encoder == "av1_nvenc")
             {
                 // NVENC (GPU) encoder settings - modern SDK presets (p1-p7)
@@ -550,7 +580,8 @@ namespace SteamRecUtility
 
         private string GetEffectiveEncoder()
         {
-            string requestedEncoder = settings.VideoEncoder;
+            // UHQ mode forces av1_nvenc
+            string requestedEncoder = settings.NvencUHQMode ? "av1_nvenc" : settings.VideoEncoder;
 
             // Fallback chain: av1_nvenc → hevc_nvenc → libx265
             if (requestedEncoder == "av1_nvenc" && !IsAv1NvencAvailable())
