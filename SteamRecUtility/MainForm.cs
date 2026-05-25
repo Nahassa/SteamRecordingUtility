@@ -194,7 +194,7 @@ namespace SteamRecUtility
 
             y += 32;
 
-            // Row 3: Load Videos + Convert All (center-ish) | Show Log (right)
+            // Row 3: Action buttons | Show Log (right)
             btnLoadVideos = new Button
             {
                 Text = "Load Videos",
@@ -207,9 +207,9 @@ namespace SteamRecUtility
 
             btnConvertAll = new Button
             {
-                Text = "Convert All",
+                Text = "Convert Selected",
                 Location = new Point(10 + labelWidth + 5 + 115, y),
-                Width = 110,
+                Width = 120,
                 Height = 28,
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
                 Enabled = false
@@ -219,7 +219,7 @@ namespace SteamRecUtility
             btnFixTimelines = new Button
             {
                 Text = "Fix Timelines",
-                Location = new Point(10 + labelWidth + 5 + 230, y),
+                Location = new Point(10 + labelWidth + 5 + 240, y),
                 Width = 110,
                 Height = 28
             };
@@ -228,7 +228,7 @@ namespace SteamRecUtility
             btnSelectAll = new Button
             {
                 Text = "Select All",
-                Location = new Point(10 + labelWidth + 5 + 345, y),
+                Location = new Point(10 + labelWidth + 5 + 355, y),
                 Width = 90,
                 Height = 28
             };
