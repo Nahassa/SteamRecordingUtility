@@ -340,6 +340,45 @@ namespace SteamRecUtility
             UpdateValueLabels();
         }
 
+        private void LstVideos_MouseDown(object? sender, MouseEventArgs e)
+        {
+            int index = lstVideos.IndexFromPoint(e.Location);
+            if (index < 0 || index >= videoItems.Count)
+                return;
+
+            videoItems[index].Selected = !videoItems[index].Selected;
+            UpdateVideoListDisplay(index);
+            UpdateSelectAllButtonText();
+        }
+
+        private void BtnSelectAll_Click(object? sender, EventArgs e)
+        {
+            if (videoItems.Count == 0) return;
+
+            bool allSelected = videoItems.All(v => v.Selected);
+            bool newState = !allSelected;
+
+            for (int i = 0; i < videoItems.Count; i++)
+            {
+                videoItems[i].Selected = newState;
+                UpdateVideoListDisplay(i);
+            }
+
+            UpdateSelectAllButtonText();
+        }
+
+        private void UpdateVideoListDisplay(int index)
+        {
+            string prefix = videoItems[index].Selected ? "☑" : "☐";
+            lstVideos.Items[index] = $"{prefix} {videoItems[index].FileName}";
+        }
+
+        private void UpdateSelectAllButtonText()
+        {
+            if (videoItems.Count == 0) return;
+            btnSelectAll.Text = videoItems.All(v => v.Selected) ? "Deselect All" : "Select All";
+        }
+
         // Conversion logic continues in next file...
     }
 }

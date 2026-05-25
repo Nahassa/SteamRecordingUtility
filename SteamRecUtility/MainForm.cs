@@ -22,6 +22,7 @@ namespace SteamRecUtility
         private Button btnLoadVideos = null!;
         private Button btnConvertAll = null!;
         private Button btnFixTimelines = null!;
+        private Button btnSelectAll = null!;
         private Button btnShowLog = null!;
 
         // Split container for resizable layout
@@ -224,6 +225,15 @@ namespace SteamRecUtility
             };
             btnFixTimelines.Click += BtnFixTimelines_Click;
 
+            btnSelectAll = new Button
+            {
+                Text = "Select All",
+                Location = new Point(10 + labelWidth + 5 + 345, y),
+                Width = 90,
+                Height = 28
+            };
+            btnSelectAll.Click += BtnSelectAll_Click;
+
             btnShowLog = new Button
             {
                 Text = "Show Log...",
@@ -233,7 +243,7 @@ namespace SteamRecUtility
             };
             btnShowLog.Click += BtnShowLog_Click;
 
-            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnFixTimelines, btnShowLog });
+            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnFixTimelines, btnSelectAll, btnShowLog });
 
             // Position anchored buttons after adding to panel
             UpdateTopPanelButtonPositions();
@@ -310,6 +320,7 @@ namespace SteamRecUtility
                 SelectionMode = SelectionMode.One
             };
             lstVideos.SelectedIndexChanged += LstVideos_SelectedIndexChanged;
+            lstVideos.MouseDown += LstVideos_MouseDown;
 
             splitMain.Panel1.Controls.AddRange(new Control[] { lstVideos, lblVideos });
         }
