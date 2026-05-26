@@ -48,6 +48,9 @@ namespace SteamRecUtility
         private NumericUpDown numUHQRcLookahead = null!;
         private Panel pnlUHQSettings = null!;
 
+        // GPU scaling
+        private CheckBox chkUseGpuScaling = null!;
+
         // Other settings
         private CheckBox chkMoveProcessed = null!;
 
@@ -65,7 +68,7 @@ namespace SteamRecUtility
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(500, 850);
+            this.Size = new Size(500, 875);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -162,7 +165,7 @@ namespace SteamRecUtility
             {
                 Text = "Default Output Settings",
                 Location = new Point(10, y),
-                Size = new Size(465, 530)
+                Size = new Size(465, 555)
             };
             this.Controls.Add(grpOutput);
 
@@ -235,7 +238,18 @@ namespace SteamRecUtility
             cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU HEVC)", "av1_nvenc (GPU AV1)" });
             cmbEncoder.SelectedIndexChanged += CmbEncoder_SelectedIndexChanged;
             grpOutput.Controls.AddRange(new Control[] { lblEncoder, cmbEncoder });
-            gy += 35;
+            gy += 30;
+
+            // GPU scaling checkbox
+            chkUseGpuScaling = new CheckBox
+            {
+                Text = "Use GPU-accelerated scaling (RTX 40/50 series recommended)",
+                Location = new Point(controlLeft, gy),
+                Width = 320,
+                Checked = true
+            };
+            grpOutput.Controls.Add(chkUseGpuScaling);
+            gy += 28;
 
             // === libx265 Settings Panel ===
             pnlX265Settings = new Panel
@@ -573,6 +587,10 @@ namespace SteamRecUtility
                 _ => 1
             };
 
+            // GPU scaling
+            chkUseGpuScaling.Checked = settings.UseGpuScaling;
+            UpdateGpuScalingEnabled();
+
             // libx265 settings
             numX265CRF.Value = settings.X265CRF;
             cmbX265Preset.SelectedItem = settings.X265Preset;
@@ -687,6 +705,15 @@ namespace SteamRecUtility
             bool isX265 = cmbEncoder.SelectedIndex == 0;
             pnlX265Settings.Visible = isX265;
             pnlNvencSettings.Visible = !isX265;
+            UpdateGpuScalingEnabled();
+        }
+
+        private void UpdateGpuScalingEnabled()
+        {
+            bool isNvenc = cmbEncoder.SelectedIndex > 0;
+            chkUseGpuScaling.Enabled = isNvenc;
+            if (!isNvenc)
+                chkUseGpuScaling.Checked = false;
         }
 
         private void TrackDefaultBrightness_ValueChanged(object? sender, EventArgs e)
@@ -746,6 +773,7 @@ namespace SteamRecUtility
                 numCustomHeight.Value = 1080;
                 cmbScalingMode.SelectedIndex = 0; // SAR
                 cmbEncoder.SelectedIndex = 1; // hevc_nvenc
+                chkUseGpuScaling.Checked = true;
 
                 // libx265 defaults
                 numX265CRF.Value = 23;
@@ -795,6 +823,9 @@ namespace SteamRecUtility
                 2 => "av1_nvenc",
                 _ => "hevc_nvenc"
             };
+
+            // GPU scaling
+            settings.UseGpuScaling = chkUseGpuScaling.Checked;
 
             // libx265 settings
             settings.X265CRF = (int)numX265CRF.Value;

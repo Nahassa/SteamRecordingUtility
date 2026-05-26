@@ -97,12 +97,16 @@ namespace SteamRecUtility
             {
                 LogInfo("Mode: Ultra High Quality (av1_nvenc UHQ)");
                 LogInfo($"  Bitrate: {settings.NvencUHQBitrate}M, Max: {settings.NvencUHQMaxrate}M, RC-Lookahead: {settings.NvencUHQRcLookahead}");
-                LogInfo($"  Scaling: {(settings.EnableScaling && settings.ScalingMode != "sar" ? "scale_cuda (GPU-accelerated)" : settings.ScalingMode == "sar" ? "SAR (preserve pixels)" : "disabled")}");
             }
             else
             {
                 LogInfo($"Encoder: {settings.VideoEncoder}");
-                LogInfo($"Scaling Mode: {(settings.ScalingMode == "sar" ? "SAR (preserve pixels)" : "Scale (resample)")}");
+            }
+            string scalingDesc = settings.ScalingMode == "sar" ? "SAR (preserve pixels)" :
+                settings.UseGpuScaling ? "GPU (scale_cuda)" : "CPU (scale + lanczos)";
+            LogInfo($"Scaling: {scalingDesc}");
+            if (!settings.NvencUHQMode)
+            {
                 if (settings.VideoEncoder == "libx265")
                 {
                     LogInfo($"  libx265 settings - CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
@@ -134,8 +138,12 @@ namespace SteamRecUtility
                     // Build dynamic filter chain based on enabled options
                     var filters = new List<string>();
 
+                    // Resolve encoder first (needed to decide GPU vs CPU scaling)
+                    string encoder = GetEffectiveEncoder();
+                    string encoderArgs = GetEncoderArguments(encoder);
+
                     // Scaling / SAR filter (if enabled)
-                    bool useHwaccelCuda = false;
+                    bool useGpuScaling = false;
                     if (settings.EnableScaling)
                     {
                         if (settings.ScalingMode == "sar")
@@ -152,20 +160,19 @@ namespace SteamRecUtility
                                 LogInfo($"  Already 16:9 ({video.OutputWidth}x{video.OutputHeight}), no SAR needed");
                             }
                         }
-                        else if (settings.NvencUHQMode)
+                        else if (settings.UseGpuScaling && (encoder == "hevc_nvenc" || encoder == "av1_nvenc"))
                         {
-                            // UHQ mode: GPU-accelerated scaling via CUDA
-                            filters.Add($"scale_cuda={video.OutputWidth}:{video.OutputHeight}:interp_algo=lanczos");
-                            filters.Add("setdar=16/9");
-                            useHwaccelCuda = true;
-                            LogInfo($"  CUDA Scaling: {video.OutputWidth}x{video.OutputHeight} (GPU-accelerated)");
+                            // GPU-accelerated scaling via CUDA (matches OBS quality)
+                            filters.Add($"scale_cuda={video.OutputWidth}:{video.OutputHeight}:interp_algo=lanczos:format=yuv420p");
+                            useGpuScaling = true;
+                            LogInfo($"  GPU Scaling (scale_cuda): {video.OutputWidth}x{video.OutputHeight}");
                         }
                         else
                         {
-                            // Traditional scale mode: resample pixels to target resolution
+                            // CPU scale mode: resample pixels to target resolution
                             filters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
                             filters.Add("setdar=16/9");
-                            LogInfo($"  Scaling: {video.OutputWidth}x{video.OutputHeight}");
+                            LogInfo($"  CPU Scaling: {video.OutputWidth}x{video.OutputHeight}");
                         }
                     }
 
@@ -179,13 +186,10 @@ namespace SteamRecUtility
                         LogInfo($"  Color: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
                     }
 
-                    // Get effective encoder (with NVENC fallback if needed)
-                    string encoder = GetEffectiveEncoder();
-                    string encoderArgs = GetEncoderArguments(encoder);
                     LogInfo($"  Using encoder: {encoder}");
 
                     // Build FFmpeg command
-                    string hwaccelFlags = useHwaccelCuda ? "-hwaccel cuda -hwaccel_output_format cuda " : "";
+                    string hwaccelFlags = useGpuScaling ? "-hwaccel cuda -hwaccel_output_format cuda " : "";
                     string args;
                     if (filters.Count > 0)
                     {
@@ -194,12 +198,30 @@ namespace SteamRecUtility
                     }
                     else
                     {
-                        // No filters, just re-encode
                         LogInfo("  Re-encoding only (no scaling or color adjustments)");
-                        args = $"-y {hwaccelFlags}-i \"{inputPath}\" {encoderArgs} \"{outputPath}\"";
+                        args = $"-y -i \"{inputPath}\" {encoderArgs} \"{outputPath}\"";
                     }
 
                     success = await RunFFmpegAsync(args);
+
+                    // Fallback: if GPU scaling failed, retry with CPU scaling
+                    if (!success && useGpuScaling)
+                    {
+                        LogWarning("  GPU scaling (scale_cuda) failed — falling back to CPU scaling");
+                        var cpuFilters = new List<string>();
+                        cpuFilters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
+                        cpuFilters.Add("setdar=16/9");
+                        if (settings.EnableColorAdjustments)
+                        {
+                            string brightnessStr2 = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
+                            string contrastStr2 = video.Contrast.ToString("0.00", CultureInfo.InvariantCulture);
+                            string saturationStr2 = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
+                            cpuFilters.Add($"eq=brightness={brightnessStr2}:contrast={contrastStr2}:saturation={saturationStr2}");
+                        }
+                        string cpuVf = string.Join(",", cpuFilters);
+                        args = $"-y -i \"{inputPath}\" -vf \"{cpuVf}\" {encoderArgs} \"{outputPath}\"";
+                        success = await RunFFmpegAsync(args);
+                    }
                 }
                 else
                 {

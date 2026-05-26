@@ -23,6 +23,9 @@ namespace SteamRecUtility
             // Scaling mode
             cmbScalingMode.SelectedIndex = settings.ScalingMode == "sar" ? 0 : 1;
 
+            // GPU scaling
+            chkUseGpuScaling.Checked = settings.UseGpuScaling;
+
             // Processing options
             chkEnableConversion.Checked = settings.EnableVideoConversion;
             chkEnableScaling.Checked = settings.EnableScaling;
@@ -48,6 +51,9 @@ namespace SteamRecUtility
 
             // Scaling mode
             settings.ScalingMode = cmbScalingMode.SelectedIndex == 0 ? "sar" : "scale";
+
+            // GPU scaling
+            settings.UseGpuScaling = chkUseGpuScaling.Checked;
 
             // Processing options
             settings.EnableVideoConversion = chkEnableConversion.Checked;

@@ -55,6 +55,7 @@ namespace SteamRecUtility
         private ComboBox cmbResolution = null!;
         private ComboBox cmbScalingMode = null!;
         private ComboBox cmbEncoder = null!;
+        private CheckBox chkUseGpuScaling = null!;
         private CheckBox chkMoveProcessed = null!;
 
         // Processing option checkboxes
@@ -639,6 +640,16 @@ namespace SteamRecUtility
             settingsContainer.Controls.AddRange(new Control[] { lblEncoder, cmbEncoder, lblEncoderNote });
             y += 50;
 
+            chkUseGpuScaling = new CheckBox
+            {
+                Text = "GPU-accelerated scaling (NVENC)",
+                Location = new Point(10, y),
+                Width = 280,
+                Checked = settings.UseGpuScaling
+            };
+            settingsContainer.Controls.Add(chkUseGpuScaling);
+            y += 26;
+
             chkMoveProcessed = new CheckBox
             {
                 Text = "Move original files to processed folder",
@@ -816,6 +827,9 @@ namespace SteamRecUtility
 
                 // Update scaling mode dropdown
                 cmbScalingMode.SelectedIndex = settings.ScalingMode == "sar" ? 0 : 1;
+
+                // Update GPU scaling checkbox
+                chkUseGpuScaling.Checked = settings.UseGpuScaling;
 
                 // Update trackbar defaults for new videos
                 trackBrightness.Value = (int)(settings.Brightness * 100);

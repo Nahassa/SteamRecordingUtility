@@ -16,6 +16,7 @@ namespace SteamRecUtility
 
         // Scaling mode: "scale" = resample pixels (traditional), "sar" = set sample aspect ratio (preserve pixels)
         public string ScalingMode { get; set; } = "sar";
+        public bool UseGpuScaling { get; set; } = true; // Use scale_cuda when NVENC encoder is active
 
         // libx265 (CPU) encoder settings
         public int X265CRF { get; set; } = 23;
