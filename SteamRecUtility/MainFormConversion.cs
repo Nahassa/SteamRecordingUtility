@@ -179,6 +179,12 @@ namespace SteamRecUtility
                     // Color adjustment filter (if enabled)
                     if (settings.EnableColorAdjustments)
                     {
+                        // eq is a CPU filter — if frames are on GPU, download them first
+                        if (useGpuScaling)
+                        {
+                            filters.Add("hwdownload");
+                            filters.Add("format=yuv420p");
+                        }
                         string brightnessStr = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
                         string contrastStr = video.Contrast.ToString("0.00", CultureInfo.InvariantCulture);
                         string saturationStr = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
