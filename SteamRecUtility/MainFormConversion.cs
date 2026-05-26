@@ -142,15 +142,30 @@ namespace SteamRecUtility
                     string encoder = GetEffectiveEncoder();
                     string encoderArgs = GetEncoderArguments(encoder);
 
-                    // Scaling / SAR filter (if enabled)
+                    // Build filter chain: color first (CPU), then scaling (GPU or CPU)
                     bool useGpuScaling = false;
+                    bool useGpuUpload = false;
+                    bool isNvenc = encoder == "hevc_nvenc" || encoder == "av1_nvenc";
+                    bool gpuScale = settings.EnableScaling && settings.ScalingMode != "sar"
+                                    && settings.UseGpuScaling && isNvenc;
+
+                    // Color adjustment filter first (CPU — must run before hwupload)
+                    if (settings.EnableColorAdjustments)
+                    {
+                        string brightnessStr = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
+                        string contrastStr = video.Contrast.ToString("0.00", CultureInfo.InvariantCulture);
+                        string saturationStr = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
+                        filters.Add($"eq=brightness={brightnessStr}:contrast={contrastStr}:saturation={saturationStr}");
+                        LogInfo($"  Color: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
+                    }
+
+                    // Scaling filter (if enabled)
                     if (settings.EnableScaling)
                     {
                         if (settings.ScalingMode == "sar")
                         {
-                            // SAR mode: preserve original pixels, set sample aspect ratio for 16:9 display
                             var (sarNum, sarDen) = ComputeSarFor16by9(video.OutputWidth, video.OutputHeight);
-                            if (sarNum != sarDen) // Skip if already 16:9
+                            if (sarNum != sarDen)
                             {
                                 filters.Add($"setsar={sarNum}/{sarDen}");
                                 LogInfo($"  SAR: {sarNum}/{sarDen} (preserving {video.OutputWidth}x{video.OutputHeight} pixels, displays as 16:9)");
@@ -160,42 +175,35 @@ namespace SteamRecUtility
                                 LogInfo($"  Already 16:9 ({video.OutputWidth}x{video.OutputHeight}), no SAR needed");
                             }
                         }
-                        else if (settings.UseGpuScaling && (encoder == "hevc_nvenc" || encoder == "av1_nvenc"))
+                        else if (gpuScale)
                         {
-                            // GPU-accelerated scaling via CUDA (matches OBS quality)
-                            filters.Add($"scale_cuda={video.OutputWidth}:{video.OutputHeight}:interp_algo=lanczos:format=yuv420p");
-                            useGpuScaling = true;
+                            if (settings.EnableColorAdjustments)
+                            {
+                                // CPU color already added above — upload to GPU, then scale
+                                filters.Add("hwupload_cuda");
+                                useGpuUpload = true;
+                            }
+                            else
+                            {
+                                // Full GPU pipeline: decode stays on GPU, scale on GPU
+                                useGpuScaling = true;
+                            }
+                            filters.Add($"scale_cuda={video.OutputWidth}:{video.OutputHeight}:interp_algo=lanczos");
                             LogInfo($"  GPU Scaling (scale_cuda): {video.OutputWidth}x{video.OutputHeight}");
                         }
                         else
                         {
-                            // CPU scale mode: resample pixels to target resolution
                             filters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
                             filters.Add("setdar=16/9");
                             LogInfo($"  CPU Scaling: {video.OutputWidth}x{video.OutputHeight}");
                         }
                     }
 
-                    // Color adjustment filter (if enabled)
-                    if (settings.EnableColorAdjustments)
-                    {
-                        // eq is a CPU filter — if frames are on GPU, download them first
-                        if (useGpuScaling)
-                        {
-                            filters.Add("hwdownload");
-                            filters.Add("format=yuv420p");
-                        }
-                        string brightnessStr = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
-                        string contrastStr = video.Contrast.ToString("0.00", CultureInfo.InvariantCulture);
-                        string saturationStr = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
-                        filters.Add($"eq=brightness={brightnessStr}:contrast={contrastStr}:saturation={saturationStr}");
-                        LogInfo($"  Color: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
-                    }
-
                     LogInfo($"  Using encoder: {encoder}");
 
                     // Build FFmpeg command
-                    string hwaccelFlags = useGpuScaling ? "-hwaccel cuda -hwaccel_output_format cuda " : "";
+                    string hwaccelFlags = useGpuScaling ? "-hwaccel cuda -hwaccel_output_format cuda " :
+                                          useGpuUpload  ? "-hwaccel cuda " : "";
                     string args;
                     if (filters.Count > 0)
                     {
@@ -211,12 +219,10 @@ namespace SteamRecUtility
                     success = await RunFFmpegAsync(args);
 
                     // Fallback: if GPU scaling failed, retry with CPU scaling
-                    if (!success && useGpuScaling)
+                    if (!success && (useGpuScaling || useGpuUpload))
                     {
                         LogWarning("  GPU scaling (scale_cuda) failed — falling back to CPU scaling");
                         var cpuFilters = new List<string>();
-                        cpuFilters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
-                        cpuFilters.Add("setdar=16/9");
                         if (settings.EnableColorAdjustments)
                         {
                             string brightnessStr2 = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
@@ -224,6 +230,8 @@ namespace SteamRecUtility
                             string saturationStr2 = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
                             cpuFilters.Add($"eq=brightness={brightnessStr2}:contrast={contrastStr2}:saturation={saturationStr2}");
                         }
+                        cpuFilters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
+                        cpuFilters.Add("setdar=16/9");
                         string cpuVf = string.Join(",", cpuFilters);
                         args = $"-y -i \"{inputPath}\" -vf \"{cpuVf}\" {encoderArgs} \"{outputPath}\"";
                         success = await RunFFmpegAsync(args);
