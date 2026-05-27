@@ -203,7 +203,7 @@ namespace SteamRecUtility
 
                     // Build FFmpeg command
                     string hwaccelFlags = useGpuScaling ? "-hwaccel cuda -hwaccel_output_format cuda " :
-                                          useGpuUpload  ? "-hwaccel cuda " : "";
+                                          useGpuUpload  ? "-init_hw_device cuda=cu -filter_hw_device cu " : "";
                     string args;
                     if (filters.Count > 0)
                     {
