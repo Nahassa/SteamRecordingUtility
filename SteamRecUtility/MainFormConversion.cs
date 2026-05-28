@@ -92,6 +92,17 @@ namespace SteamRecUtility
                 LogInfo("Created processed folder");
             }
 
+            // Validate CUDA availability once before processing any videos
+            bool cudaValidated = false;
+            bool cudaAvailable = false;
+            if (settings.UseGpuScaling)
+            {
+                cudaAvailable = CheckCudaDeviceAvailable();
+                cudaValidated = true;
+                if (!cudaAvailable)
+                    LogWarning("CUDA device not available — GPU scaling will be disabled for all videos");
+            }
+
             LogInfo($"Starting conversion of {videos.Count} video(s)");
             if (settings.NvencUHQMode)
             {
@@ -140,14 +151,14 @@ namespace SteamRecUtility
 
                     // Resolve encoder first (needed to decide GPU vs CPU scaling)
                     string encoder = GetEffectiveEncoder();
-                    string encoderArgs = GetEncoderArguments(encoder);
-
-                    // Build filter chain: color first (CPU), then scaling (GPU or CPU)
-                    bool useGpuScaling = false;
-                    bool useGpuUpload = false;
                     bool isNvenc = encoder == "hevc_nvenc" || encoder == "av1_nvenc";
                     bool gpuScale = settings.EnableScaling && settings.ScalingMode != "sar"
-                                    && settings.UseGpuScaling && isNvenc;
+                                    && settings.UseGpuScaling && isNvenc
+                                    && (!cudaValidated || cudaAvailable);
+                    string encoderArgs = GetEncoderArguments(encoder, gpuPipeline: gpuScale);
+
+                    // Build filter chain: color first (CPU), then scaling (GPU or CPU)
+                    bool useGpuUpload = false;
 
                     // Color adjustment filter first (CPU — must run before hwupload)
                     if (settings.EnableColorAdjustments)
@@ -179,14 +190,17 @@ namespace SteamRecUtility
                         {
                             if (settings.EnableColorAdjustments)
                             {
-                                // CPU color already added above — upload to GPU, then scale
+                                // CPU color already added above — convert to NV12, upload to GPU, then scale
+                                filters.Add("format=nv12");
                                 filters.Add("hwupload_cuda");
                                 useGpuUpload = true;
                             }
                             else
                             {
-                                // Full GPU pipeline: decode stays on GPU, scale on GPU
-                                useGpuScaling = true;
+                                // No color — decode on CPU, convert to NV12, upload to GPU, then scale
+                                filters.Add("format=nv12");
+                                filters.Add("hwupload_cuda");
+                                useGpuUpload = true;
                             }
                             filters.Add($"scale_cuda={video.OutputWidth}:{video.OutputHeight}:interp_algo=lanczos");
                             LogInfo($"  GPU Scaling (scale_cuda): {video.OutputWidth}x{video.OutputHeight}");
@@ -202,13 +216,13 @@ namespace SteamRecUtility
                     LogInfo($"  Using encoder: {encoder}");
 
                     // Build FFmpeg command
-                    string hwaccelFlags = useGpuScaling ? "-hwaccel cuda -hwaccel_output_format cuda " :
-                                          useGpuUpload  ? "-init_hw_device cuda=cu -filter_hw_device cu " : "";
+                    string hwaccelFlags = useGpuUpload ? "-init_hw_device cuda=cu -filter_hw_device cu " : "";
+                    string aspectFlag = (useGpuUpload && settings.EnableScaling && settings.ScalingMode != "sar") ? "-aspect 16:9 " : "";
                     string args;
                     if (filters.Count > 0)
                     {
                         string vf = string.Join(",", filters);
-                        args = $"-y {hwaccelFlags}-i \"{inputPath}\" -vf \"{vf}\" {encoderArgs} \"{outputPath}\"";
+                        args = $"-y {hwaccelFlags}-i \"{inputPath}\" -vf \"{vf}\" {aspectFlag}{encoderArgs} \"{outputPath}\"";
                     }
                     else
                     {
@@ -219,9 +233,10 @@ namespace SteamRecUtility
                     success = await RunFFmpegAsync(args);
 
                     // Fallback: if GPU scaling failed, retry with CPU scaling
-                    if (!success && (useGpuScaling || useGpuUpload))
+                    if (!success && useGpuUpload)
                     {
                         LogWarning("  GPU scaling (scale_cuda) failed — falling back to CPU scaling");
+                        string cpuEncoderArgs = GetEncoderArguments(encoder, gpuPipeline: false);
                         var cpuFilters = new List<string>();
                         if (settings.EnableColorAdjustments)
                         {
@@ -231,9 +246,9 @@ namespace SteamRecUtility
                             cpuFilters.Add($"eq=brightness={brightnessStr2}:contrast={contrastStr2}:saturation={saturationStr2}");
                         }
                         cpuFilters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
-                        cpuFilters.Add("setdar=16/9");
+                        cpuFilters.Add("setdar=16:9");
                         string cpuVf = string.Join(",", cpuFilters);
-                        args = $"-y -i \"{inputPath}\" -vf \"{cpuVf}\" {encoderArgs} \"{outputPath}\"";
+                        args = $"-y -i \"{inputPath}\" -vf \"{cpuVf}\" {cpuEncoderArgs} \"{outputPath}\"";
                         success = await RunFFmpegAsync(args);
                     }
                 }
@@ -476,6 +491,32 @@ namespace SteamRecUtility
             return null;
         }
 
+        private bool CheckCudaDeviceAvailable()
+        {
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = "-init_hw_device cuda=cu -f lavfi -i color=s=1x1:d=0.001 -t 0.001 -f null -",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using Process? process = Process.Start(psi);
+                if (process == null)
+                    return false;
+
+                return process.WaitForExit(3000) && process.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private bool IsFFmpegAvailable()
         {
             try
@@ -562,7 +603,7 @@ namespace SteamRecUtility
             return _av1NvencAvailable.Value;
         }
 
-        private string GetEncoderArguments(string encoder)
+        private string GetEncoderArguments(string encoder, bool gpuPipeline = false)
         {
             if (settings.NvencUHQMode)
             {
@@ -571,7 +612,8 @@ namespace SteamRecUtility
                 args += $" -b:v {settings.NvencUHQBitrate}M -maxrate {settings.NvencUHQMaxrate}M -bufsize {settings.NvencUHQMaxrate}M";
                 args += $" -rc-lookahead {settings.NvencUHQRcLookahead}";
                 args += " -spatial_aq 1 -temporal_aq 1";
-                args += " -pix_fmt yuv420p";
+                if (!gpuPipeline)
+                    args += " -pix_fmt yuv420p";
                 return args;
             }
 
@@ -597,7 +639,8 @@ namespace SteamRecUtility
                 if (settings.NvencTemporalAQ)
                     args += " -temporal-aq 1";
 
-                args += " -pix_fmt yuv420p";
+                if (!gpuPipeline)
+                    args += " -pix_fmt yuv420p";
                 return args;
             }
             else
