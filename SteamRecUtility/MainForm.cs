@@ -10,6 +10,7 @@ namespace SteamRecUtility
         private List<VideoItem> videoItems = new List<VideoItem>();
         private VideoItem? currentVideo;
         private System.Windows.Forms.Timer? previewRefreshTimer;
+        private CancellationTokenSource? conversionCTS = null;
 
         // Top panel controls
         private Panel pnlTop = null!;
@@ -23,6 +24,7 @@ namespace SteamRecUtility
         private Button btnConvertAll = null!;
         private Button btnFixTimelines = null!;
         private Button btnSelectAll = null!;
+        private Button btnCancel = null!;
         private Button btnShowLog = null!;
 
         // Split container for resizable layout
@@ -235,6 +237,19 @@ namespace SteamRecUtility
             };
             btnSelectAll.Click += BtnSelectAll_Click;
 
+            btnCancel = new Button
+            {
+                Text = "Cancel",
+                Location = new Point(10 + labelWidth + 5 + 450, y),
+                Width = 90,
+                Height = 28,
+                Enabled = false,
+                Visible = false,
+                ForeColor = Color.White,
+                BackColor = Color.Red
+            };
+            btnCancel.Click += BtnCancel_Click;
+
             btnShowLog = new Button
             {
                 Text = "Show Log...",
@@ -244,7 +259,7 @@ namespace SteamRecUtility
             };
             btnShowLog.Click += BtnShowLog_Click;
 
-            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnFixTimelines, btnSelectAll, btnShowLog });
+            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnFixTimelines, btnSelectAll, btnCancel, btnShowLog });
 
             // Position anchored buttons after adding to panel
             UpdateTopPanelButtonPositions();

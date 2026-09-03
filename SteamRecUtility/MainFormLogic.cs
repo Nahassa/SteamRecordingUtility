@@ -385,6 +385,12 @@ namespace SteamRecUtility
             btnSelectAll.Text = videoItems.All(v => v.Selected) ? "Deselect All" : "Select All";
         }
 
+        private void BtnCancel_Click(object? sender, EventArgs e)
+        {
+            conversionCTS?.Cancel();
+            LogWarning("Cancellation requested by user");
+        }
+
         // Conversion logic continues in next file...
     }
 }

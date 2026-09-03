@@ -52,13 +52,22 @@ namespace SteamRecUtility
 
             btnConvertAll.Enabled = false;
             btnLoadVideos.Enabled = false;
+            btnCancel.Enabled = true;
+            btnCancel.Visible = true;
             txtLog.Clear();
             progressBar.Value = 0;
             progressBar.Maximum = selectedVideos.Count;
 
+            // Create new cancellation token source for this conversion batch
+            conversionCTS = new CancellationTokenSource();
+
             try
             {
-                await ConvertVideosAsync(selectedVideos);
+                await ConvertVideosAsync(selectedVideos, conversionCTS.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                LogWarning("Conversion cancelled by user");
             }
             catch (Exception ex)
             {
@@ -68,12 +77,16 @@ namespace SteamRecUtility
             {
                 btnConvertAll.Enabled = true;
                 btnLoadVideos.Enabled = true;
+                btnCancel.Enabled = false;
+                btnCancel.Visible = false;
                 lblProgress.Text = "Ready";
                 lblCurrentTask.Text = "";
+                conversionCTS?.Dispose();
+                conversionCTS = null;
             }
         }
 
-        private async Task ConvertVideosAsync(List<VideoItem> videos)
+        private async Task ConvertVideosAsync(List<VideoItem> videos, CancellationToken ct)
         {
             string outputFolder = txtOutputFolder.Text;
             string inputFolder = txtInputFolder.Text;
@@ -131,6 +144,8 @@ namespace SteamRecUtility
 
             for (int i = 0; i < videos.Count; i++)
             {
+                ct.ThrowIfCancellationRequested();
+
                 var video = videos[i];
                 string fileName = video.FileName;
                 string inputPath = video.FilePath;
@@ -230,7 +245,7 @@ namespace SteamRecUtility
                         args = $"-y -i \"{inputPath}\" {encoderArgs} \"{outputPath}\"";
                     }
 
-                    success = await RunFFmpegAsync(args);
+                    success = await RunFFmpegAsync(args, ct);
 
                     // Fallback: if GPU scaling failed, retry with CPU scaling
                     if (!success && useGpuUpload)
@@ -249,7 +264,7 @@ namespace SteamRecUtility
                         cpuFilters.Add("setdar=16:9");
                         string cpuVf = string.Join(",", cpuFilters);
                         args = $"-y -i \"{inputPath}\" -vf \"{cpuVf}\" {cpuEncoderArgs} \"{outputPath}\"";
-                        success = await RunFFmpegAsync(args);
+                        success = await RunFFmpegAsync(args, ct);
                     }
                 }
                 else
@@ -357,7 +372,7 @@ namespace SteamRecUtility
             LogInfo("Cleaned up preview cache");
         }
 
-        private Task<bool> RunFFmpegAsync(string arguments)
+        private Task<bool> RunFFmpegAsync(string arguments, CancellationToken ct)
         {
             return Task.Run(() =>
             {
@@ -380,57 +395,75 @@ namespace SteamRecUtility
                         return false;
                     }
 
-                    // Read stderr character by character to handle FFmpeg's \r-based progress updates
-                    var errorLines = new List<string>();
-                    var lineBuilder = new System.Text.StringBuilder();
-                    string lastLoggedTime = "";
-                    int ch;
-
-                    while ((ch = process.StandardError.Read()) != -1)
+                    // Register cancellation callback to kill the process
+                    using (ct.Register(() =>
                     {
-                        if (ch == '\r' || ch == '\n')
+                        try
                         {
-                            if (lineBuilder.Length > 0)
+                            if (!process.HasExited)
                             {
-                                string trimmedLine = lineBuilder.ToString().Trim();
-                                lineBuilder.Clear();
-
-                                if (!string.IsNullOrWhiteSpace(trimmedLine))
-                                {
-                                    errorLines.Add(trimmedLine);
-                                    ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
-                                }
+                                process.Kill();
+                                Invoke(() => LogWarning("FFmpeg process terminated by cancellation request"));
                             }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            lineBuilder.Append((char)ch);
+                            Invoke(() => LogWarning($"Error killing FFmpeg process: {ex.Message}"));
                         }
-                    }
-
-                    // Process any remaining content
-                    if (lineBuilder.Length > 0)
+                    }))
                     {
-                        string trimmedLine = lineBuilder.ToString().Trim();
-                        if (!string.IsNullOrWhiteSpace(trimmedLine))
+                        // Read stderr character by character to handle FFmpeg's \r-based progress updates
+                        var errorLines = new List<string>();
+                        var lineBuilder = new System.Text.StringBuilder();
+                        string lastLoggedTime = "";
+                        int ch;
+
+                        while ((ch = process.StandardError.Read()) != -1)
                         {
-                            errorLines.Add(trimmedLine);
-                            ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
+                            if (ch == '\r' || ch == '\n')
+                            {
+                                if (lineBuilder.Length > 0)
+                                {
+                                    string trimmedLine = lineBuilder.ToString().Trim();
+                                    lineBuilder.Clear();
+
+                                    if (!string.IsNullOrWhiteSpace(trimmedLine))
+                                    {
+                                        errorLines.Add(trimmedLine);
+                                        ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                lineBuilder.Append((char)ch);
+                            }
                         }
-                    }
 
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                    {
-                        // Log the last few error lines
-                        foreach (var errorLine in errorLines.TakeLast(5))
+                        // Process any remaining content
+                        if (lineBuilder.Length > 0)
                         {
-                            Invoke(() => LogError($"  {errorLine}"));
+                            string trimmedLine = lineBuilder.ToString().Trim();
+                            if (!string.IsNullOrWhiteSpace(trimmedLine))
+                            {
+                                errorLines.Add(trimmedLine);
+                                ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
+                            }
                         }
-                    }
 
-                    return process.ExitCode == 0;
+                        process.WaitForExit();
+
+                        if (process.ExitCode != 0)
+                        {
+                            // Log the last few error lines
+                            foreach (var errorLine in errorLines.TakeLast(5))
+                            {
+                                Invoke(() => LogError($"  {errorLine}"));
+                            }
+                        }
+
+                        return process.ExitCode == 0;
+                    }
                 }
                 catch (Exception ex)
                 {
