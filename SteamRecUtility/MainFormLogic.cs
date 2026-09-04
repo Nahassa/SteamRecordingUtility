@@ -12,7 +12,19 @@ namespace SteamRecUtility
             chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
             // Encoder selection
-            cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
+            cmbEncoder.SelectedIndex = settings.VideoEncoder switch
+            {
+                "libx265" => 0,
+                "hevc_nvenc" => 1,
+                "av1_nvenc" => 2,
+                _ => 1
+            };
+
+            // Scaling mode
+            cmbScalingMode.SelectedIndex = settings.ScalingMode == "sar" ? 0 : 1;
+
+            // GPU scaling
+            chkUseGpuScaling.Checked = settings.UseGpuScaling;
 
             // Processing options
             chkEnableConversion.Checked = settings.EnableVideoConversion;
@@ -29,7 +41,19 @@ namespace SteamRecUtility
             settings.MoveProcessedFiles = chkMoveProcessed.Checked;
 
             // Encoder selection
-            settings.VideoEncoder = cmbEncoder.SelectedIndex == 0 ? "libx265" : "hevc_nvenc";
+            settings.VideoEncoder = cmbEncoder.SelectedIndex switch
+            {
+                0 => "libx265",
+                1 => "hevc_nvenc",
+                2 => "av1_nvenc",
+                _ => "hevc_nvenc"
+            };
+
+            // Scaling mode
+            settings.ScalingMode = cmbScalingMode.SelectedIndex == 0 ? "sar" : "scale";
+
+            // GPU scaling
+            settings.UseGpuScaling = chkUseGpuScaling.Checked;
 
             // Processing options
             settings.EnableVideoConversion = chkEnableConversion.Checked;
@@ -320,6 +344,51 @@ namespace SteamRecUtility
             trackSaturation.Value = 120;
 
             UpdateValueLabels();
+        }
+
+        private void LstVideos_MouseDown(object? sender, MouseEventArgs e)
+        {
+            int index = lstVideos.IndexFromPoint(e.Location);
+            if (index < 0 || index >= videoItems.Count)
+                return;
+
+            videoItems[index].Selected = !videoItems[index].Selected;
+            UpdateVideoListDisplay(index);
+            UpdateSelectAllButtonText();
+        }
+
+        private void BtnSelectAll_Click(object? sender, EventArgs e)
+        {
+            if (videoItems.Count == 0) return;
+
+            bool allSelected = videoItems.All(v => v.Selected);
+            bool newState = !allSelected;
+
+            for (int i = 0; i < videoItems.Count; i++)
+            {
+                videoItems[i].Selected = newState;
+                UpdateVideoListDisplay(i);
+            }
+
+            UpdateSelectAllButtonText();
+        }
+
+        private void UpdateVideoListDisplay(int index)
+        {
+            string prefix = videoItems[index].Selected ? "☑" : "☐";
+            lstVideos.Items[index] = $"{prefix} {videoItems[index].FileName}";
+        }
+
+        private void UpdateSelectAllButtonText()
+        {
+            if (videoItems.Count == 0) return;
+            btnSelectAll.Text = videoItems.All(v => v.Selected) ? "Deselect All" : "Select All";
+        }
+
+        private void BtnCancel_Click(object? sender, EventArgs e)
+        {
+            conversionCTS?.Cancel();
+            LogWarning("Cancellation requested by user");
         }
 
         // Conversion logic continues in next file...

@@ -10,6 +10,7 @@ namespace SteamRecUtility
         private List<VideoItem> videoItems = new List<VideoItem>();
         private VideoItem? currentVideo;
         private System.Windows.Forms.Timer? previewRefreshTimer;
+        private CancellationTokenSource? conversionCTS = null;
 
         // Top panel controls
         private Panel pnlTop = null!;
@@ -22,6 +23,8 @@ namespace SteamRecUtility
         private Button btnLoadVideos = null!;
         private Button btnConvertAll = null!;
         private Button btnFixTimelines = null!;
+        private Button btnSelectAll = null!;
+        private Button btnCancel = null!;
         private Button btnShowLog = null!;
 
         // Split container for resizable layout
@@ -50,9 +53,11 @@ namespace SteamRecUtility
         private Button btnReset = null!;
         private Button btnRefreshPreview = null!;
 
-        // Resolution and quality
+        // Resolution, scaling, and quality
         private ComboBox cmbResolution = null!;
+        private ComboBox cmbScalingMode = null!;
         private ComboBox cmbEncoder = null!;
+        private CheckBox chkUseGpuScaling = null!;
         private CheckBox chkMoveProcessed = null!;
 
         // Processing option checkboxes
@@ -192,7 +197,7 @@ namespace SteamRecUtility
 
             y += 32;
 
-            // Row 3: Load Videos + Convert All (center-ish) | Show Log (right)
+            // Row 3: Action buttons | Show Log (right)
             btnLoadVideos = new Button
             {
                 Text = "Load Videos",
@@ -205,9 +210,9 @@ namespace SteamRecUtility
 
             btnConvertAll = new Button
             {
-                Text = "Convert All",
+                Text = "Convert Selected",
                 Location = new Point(10 + labelWidth + 5 + 115, y),
-                Width = 110,
+                Width = 120,
                 Height = 28,
                 Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
                 Enabled = false
@@ -217,11 +222,33 @@ namespace SteamRecUtility
             btnFixTimelines = new Button
             {
                 Text = "Fix Timelines",
-                Location = new Point(10 + labelWidth + 5 + 230, y),
+                Location = new Point(10 + labelWidth + 5 + 240, y),
                 Width = 110,
                 Height = 28
             };
             btnFixTimelines.Click += BtnFixTimelines_Click;
+
+            btnSelectAll = new Button
+            {
+                Text = "Select All",
+                Location = new Point(10 + labelWidth + 5 + 355, y),
+                Width = 90,
+                Height = 28
+            };
+            btnSelectAll.Click += BtnSelectAll_Click;
+
+            btnCancel = new Button
+            {
+                Text = "Cancel",
+                Location = new Point(10 + labelWidth + 5 + 450, y),
+                Width = 90,
+                Height = 28,
+                Enabled = false,
+                Visible = false,
+                ForeColor = Color.White,
+                BackColor = Color.Red
+            };
+            btnCancel.Click += BtnCancel_Click;
 
             btnShowLog = new Button
             {
@@ -232,7 +259,7 @@ namespace SteamRecUtility
             };
             btnShowLog.Click += BtnShowLog_Click;
 
-            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnFixTimelines, btnShowLog });
+            pnlTop.Controls.AddRange(new Control[] { btnLoadVideos, btnConvertAll, btnFixTimelines, btnSelectAll, btnCancel, btnShowLog });
 
             // Position anchored buttons after adding to panel
             UpdateTopPanelButtonPositions();
@@ -309,6 +336,7 @@ namespace SteamRecUtility
                 SelectionMode = SelectionMode.One
             };
             lstVideos.SelectedIndexChanged += LstVideos_SelectedIndexChanged;
+            lstVideos.MouseDown += LstVideos_MouseDown;
 
             splitMain.Panel1.Controls.AddRange(new Control[] { lstVideos, lblVideos });
         }
@@ -591,6 +619,20 @@ namespace SteamRecUtility
             settingsContainer.Controls.AddRange(new Control[] { lblResolution, cmbResolution });
             y += 35;
 
+            // Scaling mode
+            var lblScalingMode = new Label { Text = "Scaling:", Location = new Point(10, y + 3), Width = labelWidth };
+            cmbScalingMode = new ComboBox
+            {
+                Location = new Point(10 + labelWidth, y),
+                Width = 200,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbScalingMode.Items.AddRange(new[] { "SAR (preserve pixels)", "Scale (resample)" });
+            cmbScalingMode.SelectedIndex = 0;
+
+            settingsContainer.Controls.AddRange(new Control[] { lblScalingMode, cmbScalingMode });
+            y += 30;
+
             var lblEncoder = new Label { Text = "Encoder:", Location = new Point(10, y + 3), Width = labelWidth };
             cmbEncoder = new ComboBox
             {
@@ -598,8 +640,8 @@ namespace SteamRecUtility
                 Width = 200,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU)" });
-            cmbEncoder.SelectedIndex = 0;
+            cmbEncoder.Items.AddRange(new[] { "libx265 (CPU)", "hevc_nvenc (GPU HEVC)", "av1_nvenc (GPU AV1)" });
+            cmbEncoder.SelectedIndex = 1;
 
             var lblEncoderNote = new Label
             {
@@ -612,6 +654,16 @@ namespace SteamRecUtility
 
             settingsContainer.Controls.AddRange(new Control[] { lblEncoder, cmbEncoder, lblEncoderNote });
             y += 50;
+
+            chkUseGpuScaling = new CheckBox
+            {
+                Text = "GPU-accelerated scaling (NVENC)",
+                Location = new Point(10, y),
+                Width = 280,
+                Checked = settings.UseGpuScaling
+            };
+            settingsContainer.Controls.Add(chkUseGpuScaling);
+            y += 26;
 
             chkMoveProcessed = new CheckBox
             {
@@ -780,7 +832,19 @@ namespace SteamRecUtility
                 chkMoveProcessed.Checked = settings.MoveProcessedFiles;
 
                 // Update encoder dropdown to match settings
-                cmbEncoder.SelectedIndex = settings.VideoEncoder == "libx265" ? 0 : 1;
+                cmbEncoder.SelectedIndex = settings.VideoEncoder switch
+                {
+                    "libx265" => 0,
+                    "hevc_nvenc" => 1,
+                    "av1_nvenc" => 2,
+                    _ => 1
+                };
+
+                // Update scaling mode dropdown
+                cmbScalingMode.SelectedIndex = settings.ScalingMode == "sar" ? 0 : 1;
+
+                // Update GPU scaling checkbox
+                chkUseGpuScaling.Checked = settings.UseGpuScaling;
 
                 // Update trackbar defaults for new videos
                 trackBrightness.Value = (int)(settings.Brightness * 100);
@@ -894,6 +958,7 @@ namespace SteamRecUtility
             // Scaling controls
             chkEnableScaling.Enabled = conversionEnabled;
             cmbResolution.Enabled = scalingEnabled;
+            cmbScalingMode.Enabled = scalingEnabled;
 
             // Color adjustment controls
             chkEnableColorAdjustments.Enabled = conversionEnabled;

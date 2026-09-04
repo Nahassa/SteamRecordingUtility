@@ -52,13 +52,22 @@ namespace SteamRecUtility
 
             btnConvertAll.Enabled = false;
             btnLoadVideos.Enabled = false;
+            btnCancel.Enabled = true;
+            btnCancel.Visible = true;
             txtLog.Clear();
             progressBar.Value = 0;
             progressBar.Maximum = selectedVideos.Count;
 
+            // Create new cancellation token source for this conversion batch
+            conversionCTS = new CancellationTokenSource();
+
             try
             {
-                await ConvertVideosAsync(selectedVideos);
+                await ConvertVideosAsync(selectedVideos, conversionCTS.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                LogWarning("Conversion cancelled by user");
             }
             catch (Exception ex)
             {
@@ -68,12 +77,16 @@ namespace SteamRecUtility
             {
                 btnConvertAll.Enabled = true;
                 btnLoadVideos.Enabled = true;
+                btnCancel.Enabled = false;
+                btnCancel.Visible = false;
                 lblProgress.Text = "Ready";
                 lblCurrentTask.Text = "";
+                conversionCTS?.Dispose();
+                conversionCTS = null;
             }
         }
 
-        private async Task ConvertVideosAsync(List<VideoItem> videos)
+        private async Task ConvertVideosAsync(List<VideoItem> videos, CancellationToken ct)
         {
             string outputFolder = txtOutputFolder.Text;
             string inputFolder = txtInputFolder.Text;
@@ -92,20 +105,47 @@ namespace SteamRecUtility
                 LogInfo("Created processed folder");
             }
 
-            LogInfo($"Starting conversion of {videos.Count} video(s)");
-            LogInfo($"Encoder: {settings.VideoEncoder}");
-            if (settings.VideoEncoder == "libx265")
+            // Validate CUDA availability once before processing any videos
+            bool cudaValidated = false;
+            bool cudaAvailable = false;
+            if (settings.UseGpuScaling)
             {
-                LogInfo($"  libx265 settings - CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
+                cudaAvailable = CheckCudaDeviceAvailable();
+                cudaValidated = true;
+                if (!cudaAvailable)
+                    LogWarning("CUDA device not available — GPU scaling will be disabled for all videos");
+            }
+
+            LogInfo($"Starting conversion of {videos.Count} video(s)");
+            if (settings.NvencUHQMode)
+            {
+                LogInfo("Mode: Ultra High Quality (av1_nvenc UHQ)");
+                LogInfo($"  Bitrate: {settings.NvencUHQBitrate}M, Max: {settings.NvencUHQMaxrate}M, RC-Lookahead: {settings.NvencUHQRcLookahead}");
             }
             else
             {
-                LogInfo($"  hevc_nvenc settings - CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, RC: {settings.NvencRateControl}, Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}");
+                LogInfo($"Encoder: {settings.VideoEncoder}");
+            }
+            string scalingDesc = settings.ScalingMode == "sar" ? "SAR (preserve pixels)" :
+                settings.UseGpuScaling ? "GPU (scale_cuda)" : "CPU (scale + lanczos)";
+            LogInfo($"Scaling: {scalingDesc}");
+            if (!settings.NvencUHQMode)
+            {
+                if (settings.VideoEncoder == "libx265")
+                {
+                    LogInfo($"  libx265 settings - CRF: {settings.X265CRF}, Preset: {settings.X265Preset}, Tune: {(string.IsNullOrEmpty(settings.X265Tune) ? "(none)" : settings.X265Tune)}");
+                }
+                else
+                {
+                    LogInfo($"  NVENC settings - CQ: {settings.NvencCQ}, Preset: {settings.NvencPreset}, Tune: {settings.NvencTune}, RC: {settings.NvencRateControl}, Multipass: {settings.NvencMultipass}, B-Frames: {settings.NvencBFrames}, Spatial AQ: {settings.NvencSpatialAQ}, Temporal AQ: {settings.NvencTemporalAQ}");
+                }
             }
             LogInfo("");
 
             for (int i = 0; i < videos.Count; i++)
             {
+                ct.ThrowIfCancellationRequested();
+
                 var video = videos[i];
                 string fileName = video.FileName;
                 string inputPath = video.FilePath;
@@ -124,15 +164,18 @@ namespace SteamRecUtility
                     // Build dynamic filter chain based on enabled options
                     var filters = new List<string>();
 
-                    // Scaling filter (if enabled)
-                    if (settings.EnableScaling)
-                    {
-                        filters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
-                        filters.Add("setdar=16/9");
-                        LogInfo($"  Scaling: {video.OutputWidth}x{video.OutputHeight}");
-                    }
+                    // Resolve encoder first (needed to decide GPU vs CPU scaling)
+                    string encoder = GetEffectiveEncoder();
+                    bool isNvenc = encoder == "hevc_nvenc" || encoder == "av1_nvenc";
+                    bool gpuScale = settings.EnableScaling && settings.ScalingMode != "sar"
+                                    && settings.UseGpuScaling && isNvenc
+                                    && (!cudaValidated || cudaAvailable);
+                    string encoderArgs = GetEncoderArguments(encoder, gpuPipeline: gpuScale);
 
-                    // Color adjustment filter (if enabled)
+                    // Build filter chain: color first (CPU), then scaling (GPU or CPU)
+                    bool useGpuUpload = false;
+
+                    // Color adjustment filter first (CPU — must run before hwupload)
                     if (settings.EnableColorAdjustments)
                     {
                         string brightnessStr = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
@@ -142,26 +185,87 @@ namespace SteamRecUtility
                         LogInfo($"  Color: Brightness={video.Brightness:0.00}, Contrast={video.Contrast:0.00}, Saturation={video.Saturation:0.00}");
                     }
 
-                    // Get effective encoder (with NVENC fallback if needed)
-                    string encoder = GetEffectiveEncoder();
-                    string encoderArgs = GetEncoderArguments(encoder);
+                    // Scaling filter (if enabled)
+                    if (settings.EnableScaling)
+                    {
+                        if (settings.ScalingMode == "sar")
+                        {
+                            var (sarNum, sarDen) = ComputeSarFor16by9(video.OutputWidth, video.OutputHeight);
+                            if (sarNum != sarDen)
+                            {
+                                filters.Add($"setsar={sarNum}/{sarDen}");
+                                LogInfo($"  SAR: {sarNum}/{sarDen} (preserving {video.OutputWidth}x{video.OutputHeight} pixels, displays as 16:9)");
+                            }
+                            else
+                            {
+                                LogInfo($"  Already 16:9 ({video.OutputWidth}x{video.OutputHeight}), no SAR needed");
+                            }
+                        }
+                        else if (gpuScale)
+                        {
+                            if (settings.EnableColorAdjustments)
+                            {
+                                // CPU color already added above — convert to NV12, upload to GPU, then scale
+                                filters.Add("format=nv12");
+                                filters.Add("hwupload_cuda");
+                                useGpuUpload = true;
+                            }
+                            else
+                            {
+                                // No color — decode on CPU, convert to NV12, upload to GPU, then scale
+                                filters.Add("format=nv12");
+                                filters.Add("hwupload_cuda");
+                                useGpuUpload = true;
+                            }
+                            filters.Add($"scale_cuda={video.OutputWidth}:{video.OutputHeight}:interp_algo=lanczos");
+                            LogInfo($"  GPU Scaling (scale_cuda): {video.OutputWidth}x{video.OutputHeight}");
+                        }
+                        else
+                        {
+                            filters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
+                            filters.Add("setdar=16/9");
+                            LogInfo($"  CPU Scaling: {video.OutputWidth}x{video.OutputHeight}");
+                        }
+                    }
+
                     LogInfo($"  Using encoder: {encoder}");
 
                     // Build FFmpeg command
+                    string hwaccelFlags = useGpuUpload ? "-init_hw_device cuda=cu -filter_hw_device cu " : "";
+                    string aspectFlag = (useGpuUpload && settings.EnableScaling && settings.ScalingMode != "sar") ? "-aspect 16:9 " : "";
                     string args;
                     if (filters.Count > 0)
                     {
                         string vf = string.Join(",", filters);
-                        args = $"-y -i \"{inputPath}\" -vf \"{vf}\" {encoderArgs} \"{outputPath}\"";
+                        args = $"-y {hwaccelFlags}-i \"{inputPath}\" -vf \"{vf}\" {aspectFlag}{encoderArgs} \"{outputPath}\"";
                     }
                     else
                     {
-                        // No filters, just re-encode
                         LogInfo("  Re-encoding only (no scaling or color adjustments)");
                         args = $"-y -i \"{inputPath}\" {encoderArgs} \"{outputPath}\"";
                     }
 
-                    success = await RunFFmpegAsync(args);
+                    success = await RunFFmpegAsync(args, ct);
+
+                    // Fallback: if GPU scaling failed, retry with CPU scaling
+                    if (!success && useGpuUpload)
+                    {
+                        LogWarning("  GPU scaling (scale_cuda) failed — falling back to CPU scaling");
+                        string cpuEncoderArgs = GetEncoderArguments(encoder, gpuPipeline: false);
+                        var cpuFilters = new List<string>();
+                        if (settings.EnableColorAdjustments)
+                        {
+                            string brightnessStr2 = video.Brightness.ToString("0.00", CultureInfo.InvariantCulture);
+                            string contrastStr2 = video.Contrast.ToString("0.00", CultureInfo.InvariantCulture);
+                            string saturationStr2 = video.Saturation.ToString("0.00", CultureInfo.InvariantCulture);
+                            cpuFilters.Add($"eq=brightness={brightnessStr2}:contrast={contrastStr2}:saturation={saturationStr2}");
+                        }
+                        cpuFilters.Add($"scale={video.OutputWidth}:{video.OutputHeight}:flags=lanczos");
+                        cpuFilters.Add("setdar=16:9");
+                        string cpuVf = string.Join(",", cpuFilters);
+                        args = $"-y -i \"{inputPath}\" -vf \"{cpuVf}\" {cpuEncoderArgs} \"{outputPath}\"";
+                        success = await RunFFmpegAsync(args, ct);
+                    }
                 }
                 else
                 {
@@ -268,7 +372,7 @@ namespace SteamRecUtility
             LogInfo("Cleaned up preview cache");
         }
 
-        private Task<bool> RunFFmpegAsync(string arguments)
+        private Task<bool> RunFFmpegAsync(string arguments, CancellationToken ct)
         {
             return Task.Run(() =>
             {
@@ -291,57 +395,75 @@ namespace SteamRecUtility
                         return false;
                     }
 
-                    // Read stderr character by character to handle FFmpeg's \r-based progress updates
-                    var errorLines = new List<string>();
-                    var lineBuilder = new System.Text.StringBuilder();
-                    string lastLoggedTime = "";
-                    int ch;
-
-                    while ((ch = process.StandardError.Read()) != -1)
+                    // Register cancellation callback to kill the process
+                    using (ct.Register(() =>
                     {
-                        if (ch == '\r' || ch == '\n')
+                        try
                         {
-                            if (lineBuilder.Length > 0)
+                            if (!process.HasExited)
                             {
-                                string trimmedLine = lineBuilder.ToString().Trim();
-                                lineBuilder.Clear();
-
-                                if (!string.IsNullOrWhiteSpace(trimmedLine))
-                                {
-                                    errorLines.Add(trimmedLine);
-                                    ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
-                                }
+                                process.Kill();
+                                Invoke(() => LogWarning("FFmpeg process terminated by cancellation request"));
                             }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            lineBuilder.Append((char)ch);
+                            Invoke(() => LogWarning($"Error killing FFmpeg process: {ex.Message}"));
                         }
-                    }
-
-                    // Process any remaining content
-                    if (lineBuilder.Length > 0)
+                    }))
                     {
-                        string trimmedLine = lineBuilder.ToString().Trim();
-                        if (!string.IsNullOrWhiteSpace(trimmedLine))
+                        // Read stderr character by character to handle FFmpeg's \r-based progress updates
+                        var errorLines = new List<string>();
+                        var lineBuilder = new System.Text.StringBuilder();
+                        string lastLoggedTime = "";
+                        int ch;
+
+                        while ((ch = process.StandardError.Read()) != -1)
                         {
-                            errorLines.Add(trimmedLine);
-                            ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
+                            if (ch == '\r' || ch == '\n')
+                            {
+                                if (lineBuilder.Length > 0)
+                                {
+                                    string trimmedLine = lineBuilder.ToString().Trim();
+                                    lineBuilder.Clear();
+
+                                    if (!string.IsNullOrWhiteSpace(trimmedLine))
+                                    {
+                                        errorLines.Add(trimmedLine);
+                                        ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                lineBuilder.Append((char)ch);
+                            }
                         }
-                    }
 
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                    {
-                        // Log the last few error lines
-                        foreach (var errorLine in errorLines.TakeLast(5))
+                        // Process any remaining content
+                        if (lineBuilder.Length > 0)
                         {
-                            Invoke(() => LogError($"  {errorLine}"));
+                            string trimmedLine = lineBuilder.ToString().Trim();
+                            if (!string.IsNullOrWhiteSpace(trimmedLine))
+                            {
+                                errorLines.Add(trimmedLine);
+                                ProcessFFmpegLine(trimmedLine, ref lastLoggedTime);
+                            }
                         }
-                    }
 
-                    return process.ExitCode == 0;
+                        process.WaitForExit();
+
+                        if (process.ExitCode != 0)
+                        {
+                            // Log the last few error lines
+                            foreach (var errorLine in errorLines.TakeLast(5))
+                            {
+                                Invoke(() => LogError($"  {errorLine}"));
+                            }
+                        }
+
+                        return process.ExitCode == 0;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -402,6 +524,32 @@ namespace SteamRecUtility
             return null;
         }
 
+        private bool CheckCudaDeviceAvailable()
+        {
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = "-init_hw_device cuda=cu -f lavfi -i color=s=1x1:d=0.001 -t 0.001 -f null -",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using Process? process = Process.Start(psi);
+                if (process == null)
+                    return false;
+
+                return process.WaitForExit(3000) && process.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private bool IsFFmpegAvailable()
         {
             try
@@ -429,13 +577,14 @@ namespace SteamRecUtility
             }
         }
 
-        private bool? _nvencAvailable = null;
+        private bool? _hevcNvencAvailable = null;
+        private bool? _av1NvencAvailable = null;
+        private string? _encoderListCache = null;
 
-        private bool IsNvencAvailable()
+        private string GetEncoderList()
         {
-            // Cache the result to avoid repeated checks
-            if (_nvencAvailable.HasValue)
-                return _nvencAvailable.Value;
+            if (_encoderListCache != null)
+                return _encoderListCache;
 
             try
             {
@@ -452,32 +601,70 @@ namespace SteamRecUtility
                 using Process? process = Process.Start(psi);
                 if (process == null)
                 {
-                    _nvencAvailable = false;
-                    return false;
+                    _encoderListCache = "";
+                    return "";
                 }
 
                 string output = process.StandardOutput.ReadToEnd();
                 process.WaitForExit();
 
-                _nvencAvailable = output.Contains("hevc_nvenc");
-                return _nvencAvailable.Value;
+                _encoderListCache = output;
+                return output;
             }
             catch
             {
-                _nvencAvailable = false;
-                return false;
+                _encoderListCache = "";
+                return "";
             }
         }
 
-        private string GetEncoderArguments(string encoder)
+        private bool IsNvencAvailable()
         {
-            if (encoder == "hevc_nvenc")
+            if (_hevcNvencAvailable.HasValue)
+                return _hevcNvencAvailable.Value;
+
+            _hevcNvencAvailable = GetEncoderList().Contains("hevc_nvenc");
+            return _hevcNvencAvailable.Value;
+        }
+
+        private bool IsAv1NvencAvailable()
+        {
+            if (_av1NvencAvailable.HasValue)
+                return _av1NvencAvailable.Value;
+
+            _av1NvencAvailable = GetEncoderList().Contains("av1_nvenc");
+            return _av1NvencAvailable.Value;
+        }
+
+        private string GetEncoderArguments(string encoder, bool gpuPipeline = false)
+        {
+            if (settings.NvencUHQMode)
             {
-                // hevc_nvenc (GPU) encoder settings - single-pass only
-                var args = $"-c:v hevc_nvenc -preset {settings.NvencPreset} -rc {settings.NvencRateControl}";
+                // Ultra High Quality mode: av1_nvenc with VBR bitrate targeting
+                var args = $"-c:v av1_nvenc -preset p7 -tune uhq";
+                args += $" -b:v {settings.NvencUHQBitrate}M -maxrate {settings.NvencUHQMaxrate}M -bufsize {settings.NvencUHQMaxrate}M";
+                args += $" -rc-lookahead {settings.NvencUHQRcLookahead}";
+                args += " -spatial_aq 1 -temporal_aq 1";
+                if (!gpuPipeline)
+                    args += " -pix_fmt yuv420p";
+                return args;
+            }
+
+            if (encoder == "hevc_nvenc" || encoder == "av1_nvenc")
+            {
+                // NVENC (GPU) encoder settings - modern SDK presets (p1-p7)
+                var args = $"-c:v {encoder} -preset {settings.NvencPreset} -tune {settings.NvencTune} -rc {settings.NvencRateControl}";
 
                 // CQ level (quality parameter)
                 args += $" -cq {settings.NvencCQ}";
+
+                // Multipass encoding
+                if (settings.NvencMultipass != "disabled")
+                    args += $" -multipass {settings.NvencMultipass}";
+
+                // B-frames for better compression
+                if (settings.NvencBFrames > 0)
+                    args += $" -bf {settings.NvencBFrames}";
 
                 // Adaptive quantization
                 if (settings.NvencSpatialAQ)
@@ -485,12 +672,13 @@ namespace SteamRecUtility
                 if (settings.NvencTemporalAQ)
                     args += " -temporal-aq 1";
 
-                args += " -pix_fmt yuv420p";
+                if (!gpuPipeline)
+                    args += " -pix_fmt yuv420p";
                 return args;
             }
             else
             {
-                // libx265 (CPU) encoder settings - single-pass only
+                // libx265 (CPU) encoder settings
                 var args = $"-c:v libx265 -crf {settings.X265CRF} -preset {settings.X265Preset}";
 
                 // Add tune if specified
@@ -504,9 +692,22 @@ namespace SteamRecUtility
 
         private string GetEffectiveEncoder()
         {
-            string requestedEncoder = settings.VideoEncoder;
+            // UHQ mode forces av1_nvenc
+            string requestedEncoder = settings.NvencUHQMode ? "av1_nvenc" : settings.VideoEncoder;
 
-            // If NVENC requested but not available, fall back to libx265
+            // Fallback chain: av1_nvenc → hevc_nvenc → libx265
+            if (requestedEncoder == "av1_nvenc" && !IsAv1NvencAvailable())
+            {
+                LogWarning("AV1 NVENC encoder not available.");
+                if (IsNvencAvailable())
+                {
+                    LogWarning("Falling back to HEVC NVENC (hevc_nvenc).");
+                    return "hevc_nvenc";
+                }
+                LogWarning("Falling back to CPU encoder (libx265).");
+                return "libx265";
+            }
+
             if (requestedEncoder == "hevc_nvenc" && !IsNvencAvailable())
             {
                 LogWarning("NVENC encoder not available. Falling back to CPU encoder (libx265).");
@@ -514,6 +715,31 @@ namespace SteamRecUtility
             }
 
             return requestedEncoder;
+        }
+
+        /// <summary>
+        /// Computes the SAR (Sample Aspect Ratio) needed to make the given resolution
+        /// display at 16:9. Returns (numerator, denominator) simplified by GCD.
+        /// </summary>
+        private static (int num, int den) ComputeSarFor16by9(int width, int height)
+        {
+            // DAR = SAR * (width / height) = 16/9
+            // SAR = (16 * height) / (9 * width)
+            int num = 16 * height;
+            int den = 9 * width;
+            int gcd = GCD(num, den);
+            return (num / gcd, den / gcd);
+        }
+
+        private static int GCD(int a, int b)
+        {
+            while (b != 0)
+            {
+                int temp = b;
+                b = a % b;
+                a = temp;
+            }
+            return a;
         }
 
         private void LogInfo(string message)
